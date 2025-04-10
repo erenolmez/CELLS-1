@@ -16,16 +16,17 @@ class CellularNetworkEnv(gym.Env):
         self.cols = 6
         # self.max_users = 3  # Max users per cell
         self.coverage_radius = 1  # Range of coverage for each antenna
-        
-        # Define movement transition probabilities
-        self.transition_probs = [0.6, 0.1, 0.1, 0.1, 0.1]  # Stay, Left, Right, Up, Down
 
         # State representation
         self.car_grid = np.zeros((self.rows, self.cols), dtype=int)  # Users per cell
         self.antenna_grid = np.zeros((self.rows, self.cols), dtype=int)  # 0 (No Antenna), 1 (Antenna)
         
-        # Place antennas randomly
-        self.num_antennas = random.randint(1, self.rows * self.cols // 4)
+        
+        # Place antennas 
+        self.total_users = 5000
+        self.num_cells = self.rows * self.cols
+        self.num_antennas = self.total_users // self.num_cells
+        # self.num_antennas = random.randint(1, self.rows * self.cols // 4)
         self.place_antennas()
         
         # Place users randomly
@@ -43,16 +44,19 @@ class CellularNetworkEnv(gym.Env):
         self.reset()
     
     def place_antennas(self):
-        """ Randomly place antennas ensuring at most 1 per cell. """
+        """Randomly distribute antennas across the grid (multiple per cell allowed)."""
         self.antenna_grid = np.zeros((self.rows, self.cols), dtype=int)
-        antenna_positions = random.sample([(r, c) for r in range(self.rows) for c in range(self.cols)], self.num_antennas)
-        for r, c in antenna_positions:
-            self.antenna_grid[r, c] = 1
-    
+
+        for _ in range(self.num_antennas):
+            r = random.randint(0, self.rows - 1)
+            c = random.randint(0, self.cols - 1)
+            self.antenna_grid[r, c] += 1
+
     def place_users(self):
         """ Randomly distribute 5000 users across the grid. """
-        total_users = 5000
-        flat_grid = np.random.multinomial(total_users, [1/(self.rows*self.cols)]*(self.rows*self.cols))
+        # total_users = 5000
+        # flat_grid = np.random.multinomial(total_users, [1/(self.rows*self.cols)]*(self.rows*self.cols))
+        flat_grid = np.random.multinomial(self.total_users, [1 / self.num_cells] * self.num_cells)
         self.car_grid = np.array(flat_grid).reshape((self.rows, self.cols))
     
     def check_coverage(self):
@@ -78,31 +82,34 @@ class CellularNetworkEnv(gym.Env):
 
         return covered_grid, failures, redirects
     
-    def move_users_markov_chain(self):
-        """ Move users based on Markov Chain transition probabilities. """
+    def move_users_markov_chain(self, p_move=0.4):
+        """Move users based on probability p_move and uniform distribution among neighbors."""
         new_car_grid = np.zeros((self.rows, self.cols), dtype=int)
-        
+
         for r in range(self.rows):
             for c in range(self.cols):
                 users = self.car_grid[r, c]
-                for _ in range(users):  # Move each user individually
-                    move = np.random.choice(["stay", "left", "right", "up", "down"], p=self.transition_probs)
-                    
-                    # Compute new position
-                    new_r, new_c = r, c
-                    if move == "left" and c > 0:
-                        new_c -= 1
-                    elif move == "right" and c < self.cols - 1:
-                        new_c += 1
-                    elif move == "up" and r > 0:
-                        new_r -= 1
-                    elif move == "down" and r < self.rows - 1:
-                        new_r += 1
-                    
-                    # Update new grid
-                    new_car_grid[new_r, new_c] += 1
-        
-        self.car_grid = new_car_grid  # Update grid with new user positions
+                for _ in range(users):
+                    if np.random.rand() < p_move:
+                        # Get valid neighboring positions
+                        neighbors = []
+                        for dr in [-1, 0, 1]:
+                            for dc in [-1, 0, 1]:
+                                if dr == 0 and dc == 0:
+                                    continue  # skip self
+                                nr, nc = r + dr, c + dc
+                                if 0 <= nr < self.rows and 0 <= nc < self.cols:
+                                    neighbors.append((nr, nc))
+                        # Choose a neighbor randomly
+                        if neighbors:
+                            new_r, new_c = random.choice(neighbors)
+                            new_car_grid[new_r, new_c] += 1
+                        else:
+                            new_car_grid[r, c] += 1  # fallback to staying
+                    else:
+                        new_car_grid[r, c] += 1  # user stays in place
+
+        self.car_grid = new_car_grid
 
     def update_after_user_movement(self):
             """ Update coverage and failures after user movement. """
@@ -116,10 +123,12 @@ class CellularNetworkEnv(gym.Env):
         return np.concatenate((self.car_grid.flatten(), self.antenna_grid.flatten()))
     
     def step(self, action):
-        """ Placeholder for action-based updates. """
-        reward = 0  # Define reward based on coverage and failure reduction
-        done = False  # No termination condition yet
-        return np.concatenate((self.car_grid.flatten(), self.antenna_grid.flatten())), reward, done, {}
+        self.move_users_markov_chain()
+        covered_grid, failures, redirects = self.check_coverage()
+        reward = -(failures + 0.1 * redirects + 0.01 * np.sum(self.antenna_grid))
+        done = False
+        obs = np.concatenate((self.car_grid.flatten(), self.antenna_grid.flatten()))
+        return obs, reward, done, {}
     
     def render(self):
         """ Display the grid state with separate visuals for cars, antennas, and coverage. """
@@ -158,20 +167,20 @@ class CellularNetworkEnv(gym.Env):
         # plot_single_heatmap(self.antenna_grid, title="Antenna Grid (0 or 1)", cmap="viridis")
         # plot_single_heatmap(self.covered_grid, title="Coverage Grid (0 = Uncovered, 1 = Covered)", cmap="Greens")
 
-# %%
-# Test the environment
-env = CellularNetworkEnv()
-env.render()
-env.render_heatmaps()
-print("Total users before:", np.sum(env.car_grid))
+# # %%
+# # Test the environment
+# env = CellularNetworkEnv()
+# env.render()
+# env.render_heatmaps()
+# print("Total users before:", np.sum(env.car_grid))
 
 
-# %%
+# # %%
 
-# Move users using Markov Chain
-env.move_users_markov_chain()
-print("\nAfter User Movement (Markov Chain):")
- #env.render()
-env.render_heatmaps()
-print("Total users after: ", np.sum(env.car_grid))
-# %%
+# # Move users using Markov Chain
+# env.move_users_markov_chain()
+# print("\nAfter User Movement (Markov Chain):")
+#  #env.render()
+# env.render_heatmaps()
+# print("Total users after: ", np.sum(env.car_grid))
+# # %%
