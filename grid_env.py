@@ -4,13 +4,15 @@ import gym
 from gym import spaces
 import random
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 # %%
 class CellularNetworkEnv(gym.Env):
     """ Gym environment for optimizing antenna placement and handling failures. """
     
     def __init__(self):
         super(CellularNetworkEnv, self).__init__()
-        
+        self.sim_time_hours = 0
+
         # Grid settings
         self.rows = 6
         self.cols = 6
@@ -30,10 +32,9 @@ class CellularNetworkEnv(gym.Env):
             spaces.Discrete(self.cols),
             spaces.Discrete(2)  # 0 = add, 1 = remove
         ))
-        self.num_antennas = self.total_users // self.num_cells
-        # self.num_antennas = random.randint(1, self.rows * self.cols // 4)
-        self.max_antennas = self.total_users // self.num_cells  # e.g., 14
-        self.antenna_capacity = 30  # Max users an antenna can handle
+        self.antenna_capacity = 200  # Max users an antenna can handle
+        self.num_antennas = self.total_users // self.antenna_capacity
+        self.max_antennas = self.total_users // self.antenna_capacity
         self.place_antennas()
         
         # Place users randomly
@@ -58,6 +59,11 @@ class CellularNetworkEnv(gym.Env):
         np.random.seed(seed)
         random.seed(seed)
         return [seed]
+    
+    def get_sim_time(self):
+        day = self.sim_time_hours // 24
+        hour = self.sim_time_hours % 24
+        return f"Day {day}, {hour:02d}:00"
 
     def _compute_neighbor_map(self):
         self.neighbor_map = {}
@@ -174,7 +180,6 @@ class CellularNetworkEnv(gym.Env):
         reward = 1.0 - (2.0 * failure_penalty + 0.5 * redirect_penalty + 0.3 * antenna_cost)
         return reward
 
-    
     def step(self, action):
         r, c, op = action
 
@@ -191,6 +196,10 @@ class CellularNetworkEnv(gym.Env):
         # Evaluate coverage
         covered_grid, failures, redirects = self.check_coverage()
         reward = self.calculate_reward(failures, redirects)
+
+        # ⏱️ 
+        self.sim_time_hours += 1  # advance simulation time by 1 hour
+
         done = False
 
         obs = np.concatenate((self.car_grid.flatten(), self.antenna_grid.flatten()))
@@ -232,6 +241,21 @@ class CellularNetworkEnv(gym.Env):
     
         # plot_single_heatmap(self.antenna_grid, title="Antenna Grid (0 or 1)", cmap="viridis")
         # plot_single_heatmap(self.covered_grid, title="Coverage Grid (0 = Uncovered, 1 = Covered)", cmap="Greens")
+
+    def animate_car_grid(self, steps=20, interval=500):
+        """Animates car movement across the grid using a heatmap."""
+        fig, ax = plt.subplots(figsize=(5, 5))
+        heatmap = ax.imshow(self.car_grid, cmap="YlOrRd", vmin=0, vmax=self.car_grid.max())
+        title = ax.set_title("User Distribution (Step 0)")
+
+        def update(frame):
+            self.move_users_markov_chain()
+            heatmap.set_data(self.car_grid)
+            title.set_text(f"User Distribution (Step {frame+1})")
+            return heatmap,
+
+        anim = FuncAnimation(fig, update, frames=steps, interval=interval, blit=False, repeat=False)
+        plt.show()
 
 # %%
 # # Test the environment
