@@ -323,21 +323,22 @@ class CellularNetworkEnv(gym.Env):
 
 #%%
 # Test the environment
-env = CellularNetworkEnv()
-env.render()
-env.render_heatmaps()
-print("Total users before:", np.sum(env.car_grid))
+# env = CellularNetworkEnv()
+# env.render()
+# env.render_heatmaps()
+# print("Total users before:", np.sum(env.car_grid))
 
- #%%
+#  #%%
 
-# Move users using Markov Chain
-env.move_users_markov_chain()
-print("\nAfter User Movement (Markov Chain):")
-env.render()
-env.render_heatmaps()
-env.animate_car_grid(steps=20, interval=500)
-print("Total users after: ", np.sum(env.car_grid))
-# # # %%
+# # Move users using Markov Chain
+# env.move_users_markov_chain()
+# print("\nAfter User Movement (Markov Chain):")
+# env.render()
+# env.render_heatmaps()
+# env.animate_car_grid(steps=20, interval=500)
+# print("Total users after: ", np.sum(env.car_grid))
+# # # # %%
 
-# %%
-print("Trial for Ege")
+# # %%
+# print("Trial for Ege")
+# print("Trial for Alessia")
