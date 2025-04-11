@@ -5,17 +5,21 @@ from gym import spaces
 import random
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from matplotlib.patches import Circle
+from matplotlib import gridspec
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 # %%
 class CellularNetworkEnv(gym.Env):
     """ Gym environment for optimizing antenna placement and handling failures. """
-    
-    def __init__(self):
+
+    def __init__(self, rows=6, cols=6, total_users=5000, antenna_capacity=300):
         super(CellularNetworkEnv, self).__init__()
         self.sim_time_hours = 0
 
         # Grid settings
-        self.rows = 6
-        self.cols = 6
+        self.rows = rows
+        self.cols = cols
         # self.max_users = 3  # Max users per cell
         self.coverage_radius = 1  # Range of coverage for each antenna
 
@@ -25,14 +29,14 @@ class CellularNetworkEnv(gym.Env):
         
         
         # Place antennas 
-        self.total_users = 5000
+        self.total_users = total_users
         self.num_cells = self.rows * self.cols
         self.action_space = spaces.Tuple((
             spaces.Discrete(self.rows),
             spaces.Discrete(self.cols),
             spaces.Discrete(2)  # 0 = add, 1 = remove
         ))
-        self.antenna_capacity = 200  # Max users an antenna can handle
+        self.antenna_capacity = antenna_capacity
         self.num_antennas = self.total_users // self.antenna_capacity
         self.max_antennas = self.total_users // self.antenna_capacity
         self.place_antennas()
@@ -97,7 +101,7 @@ class CellularNetworkEnv(gym.Env):
         print(self.car_grid)
         
     def check_coverage(self):
-        covered_grid = np.zeros((self.rows, self.cols), dtype=int)
+        covered_grid = np.zeros((self.rows, self.cols), dtype=int)  # now stores 0–100%
         failures = 0
         redirects = 0
         antenna_load = np.zeros((self.rows, self.cols), dtype=int)
@@ -106,6 +110,7 @@ class CellularNetworkEnv(gym.Env):
             for c in range(self.cols):
                 users_in_cell = self.car_grid[r, c]
                 remaining_users = users_in_cell
+                users_served = 0
 
                 for dr in range(-self.coverage_radius, self.coverage_radius + 1):
                     for dc in range(-self.coverage_radius, self.coverage_radius + 1):
@@ -118,8 +123,8 @@ class CellularNetworkEnv(gym.Env):
                                 served = min(free_capacity, remaining_users)
                                 antenna_load[nr, nc] += served
                                 remaining_users -= served
+                                users_served += served
 
-                                covered_grid[r, c] = 1
                                 if (nr != r or nc != c):
                                     redirects += served
 
@@ -127,6 +132,12 @@ class CellularNetworkEnv(gym.Env):
                             break
 
                 failures += remaining_users
+
+                if users_in_cell > 0:
+                    percent_covered = int((users_served / users_in_cell) * 100)
+                    covered_grid[r, c] = percent_covered
+                else:
+                    covered_grid[r, c] = 0
 
         return covered_grid, failures, redirects
 
@@ -210,7 +221,7 @@ class CellularNetworkEnv(gym.Env):
         self.covered_grid, failures, redirects = self.check_coverage()
         print("\nCar Grid (Users per cell):")
         print(self.car_grid)
-        print("\nAntenna Grid (0: No Antenna, 1: Antenna):")
+        print("\nAntenna Grid (Values = Antenna count per cell):")
         print(self.antenna_grid)
         print("\nCoverage Grid (1: Covered, 0: Not Covered):")
         print(self.covered_grid)
@@ -243,36 +254,89 @@ class CellularNetworkEnv(gym.Env):
         # plot_single_heatmap(self.covered_grid, title="Coverage Grid (0 = Uncovered, 1 = Covered)", cmap="Greens")
 
     def animate_car_grid(self, steps=20, interval=500):
-        """Animates car movement across the grid using a heatmap."""
-        fig, ax = plt.subplots(figsize=(5, 5))
+        """Animates user movement with top-right coverage markers and aligned colorbar."""
+
+        fig, ax = plt.subplots(figsize=(6, 6))
+
+        # Attach a perfectly sized colorbar next to the grid
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.1)
+
         heatmap = ax.imshow(self.car_grid, cmap="YlOrRd", vmin=0, vmax=self.car_grid.max())
+        fig.colorbar(heatmap, cax=cax).set_label("Users per Cell")
+
+        # Title for sim time
         title = ax.set_title("User Distribution (Step 0)")
+
+        # Add cell user count text
+        text_annotations = []
+        for i in range(self.rows):
+            for j in range(self.cols):
+                text = ax.text(j, i, str(self.car_grid[i, j]), ha="center", va="center", fontsize=8)
+                text_annotations.append(text)
+
+        # Coverage indicator circles (top-right corners)
+        circles = []
+        for i in range(self.rows):
+            for j in range(self.cols):
+                circle = Circle((j + 0.35, i - 0.35), radius=0.08, facecolor='gray', edgecolor='black')
+                ax.add_patch(circle)
+                circles.append(circle)
 
         def update(frame):
             self.move_users_markov_chain()
+            covered_grid, _, _ = self.check_coverage()
             heatmap.set_data(self.car_grid)
-            title.set_text(f"User Distribution (Step {frame+1})")
-            return heatmap,
 
+            # Update time
+            self.sim_time_hours += 1
+            day = self.sim_time_hours // 24
+            hour = self.sim_time_hours % 24
+            title.set_text(f"User Distribution (Day {day}, {hour:02d}:00)")
+
+            # Update numbers
+            for i in range(self.rows):
+                for j in range(self.cols):
+                    idx = i * self.cols + j
+                    text_annotations[idx].set_text(str(self.car_grid[i, j]))
+
+            # Update coverage markers
+            for idx, circle in enumerate(circles):
+                r, c = divmod(idx, self.cols)
+                coverage = covered_grid[r, c]
+                if coverage == 100:
+                    circle.set_facecolor('green')
+                elif coverage == 0:
+                    circle.set_facecolor('red')
+                else:
+                    circle.set_facecolor('orange')
+
+            return [heatmap] + text_annotations + circles
+
+        # Set axis limits for padding and alignment
+        ax.set_xlim(-0.5, self.cols - 0.5)
+        ax.set_ylim(self.rows - 0.5, -0.5)
+
+        plt.tight_layout()
         anim = FuncAnimation(fig, update, frames=steps, interval=interval, blit=False, repeat=False)
         plt.show()
 
-# %%
-# # Test the environment
-# env = CellularNetworkEnv()
-# env.render()
-# env.render_heatmaps()
-# print("Total users before:", np.sum(env.car_grid))
+#%%
+# Test the environment
+env = CellularNetworkEnv()
+env.render()
+env.render_heatmaps()
+print("Total users before:", np.sum(env.car_grid))
 
+ #%%
 
-# # %%
-
-# # Move users using Markov Chain
-# env.move_users_markov_chain()
-# print("\nAfter User Movement (Markov Chain):")
-#  #env.render()
-# env.render_heatmaps()
-# print("Total users after: ", np.sum(env.car_grid))
+# Move users using Markov Chain
+env.move_users_markov_chain()
+print("\nAfter User Movement (Markov Chain):")
+env.render()
+env.render_heatmaps()
+env.animate_car_grid(steps=20, interval=500)
+print("Total users after: ", np.sum(env.car_grid))
 # # # %%
 
 # %%
