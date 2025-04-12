@@ -13,8 +13,9 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 class CellularNetworkEnv(gym.Env):
     """ Gym environment for optimizing antenna placement and handling failures. """
 
-    def __init__(self, rows=6, cols=6, total_users=5000, antenna_capacity=300):
+    def __init__(self, rows=6, cols=6, total_users=5000, antenna_capacity=300, time_step=60):
         super(CellularNetworkEnv, self).__init__()
+        self.time_step = time_step  # real-time duration per step (in minutes)
         self.sim_time_hours = 0
 
         # Grid settings
@@ -26,7 +27,6 @@ class CellularNetworkEnv(gym.Env):
         # State representation
         self.car_grid = np.zeros((self.rows, self.cols), dtype=int)  # Users per cell
         self.antenna_grid = np.zeros((self.rows, self.cols), dtype=int)  # 0 (No Antenna), 1 (Antenna)
-        
         
         # Place antennas 
         self.total_users = total_users
@@ -64,6 +64,14 @@ class CellularNetworkEnv(gym.Env):
         random.seed(seed)
         return [seed]
     
+    def compute_dynamic_p_move(self):
+        """
+        Movement probability scaled to match the real-time length of each step.
+        Assumes 0.4 move probability per 60-minute step.
+        """
+        baseline_p_move = 0.4
+        return baseline_p_move * (self.time_step / 60)
+
     def get_sim_time(self):
         day = self.sim_time_hours // 24
         hour = self.sim_time_hours % 24
@@ -141,7 +149,8 @@ class CellularNetworkEnv(gym.Env):
 
         return covered_grid, failures, redirects
 
-    def move_users_markov_chain(self, p_move=0.4):
+    def move_users_markov_chain(self):
+        p_move = self.compute_dynamic_p_move()
         new_car_grid = np.zeros((self.rows, self.cols), dtype=int)
 
         for r in range(self.rows):
@@ -289,10 +298,10 @@ class CellularNetworkEnv(gym.Env):
             heatmap.set_data(self.car_grid)
 
             # Update time
-            self.sim_time_hours += 1
             day = self.sim_time_hours // 24
             hour = self.sim_time_hours % 24
             title.set_text(f"User Distribution (Day {day}, {hour:02d}:00)")
+            self.sim_time_hours += 1
 
             # Update numbers
             for i in range(self.rows):
@@ -323,22 +332,19 @@ class CellularNetworkEnv(gym.Env):
 
 #%%
 # Test the environment
-# env = CellularNetworkEnv()
-# env.render()
-# env.render_heatmaps()
-# print("Total users before:", np.sum(env.car_grid))
+env = CellularNetworkEnv()
+env.render()
+env.render_heatmaps()
+print("Total users before:", np.sum(env.car_grid))
 
-#  #%%
+ #%%
 
-# # Move users using Markov Chain
-# env.move_users_markov_chain()
-# print("\nAfter User Movement (Markov Chain):")
-# env.render()
-# env.render_heatmaps()
-# env.animate_car_grid(steps=20, interval=500)
-# print("Total users after: ", np.sum(env.car_grid))
-# # # # %%
+# Move users using Markov Chain
+env.move_users_markov_chain()
+print("\nAfter User Movement (Markov Chain):")
+env.render()
+env.render_heatmaps()
+env.animate_car_grid(steps=24, interval=500)
+print("Total users after: ", np.sum(env.car_grid))
 
-# # %%
-# print("Trial for Ege")
-# print("Trial for Alessia")
+ #%%
