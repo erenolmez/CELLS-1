@@ -39,9 +39,21 @@ CELLS simulates:
 
 ## ⌛ Time Modeling
 
-Each simulation step corresponds to **1 hour** of real time.
+CELLS includes time-aware simulation logic with configurable temporal resolution:
 
-- 24 steps = 1 day
-- 720 steps = ~1 month
-- Users move with a tunable probability `p_move` calibrated to match ~4–6 location changes/day
-- Antennas can be reconfigured over time to match shifting load
+- Each **simulation step** corresponds to a defined amount of **real-world time**, set via the `time_step` parameter (in minutes).
+  - Default: `time_step = 60` → 1 sim step = 1 real hour
+  - Examples:
+    - `time_step = 15` → 4 steps = 1 hour
+    - `time_step = 120` → 1 step = 2 hours
+
+- User movement is governed by a **Markov Chain model**, with the probability of user relocation (`p_move`) automatically scaled based on the `time_step`.
+  - At `time_step = 60`, the default `p_move = 0.4`
+  - Shorter steps → lower movement probability
+  - Longer steps → higher movement probability
+
+- This scaling aims to maintain consistency in movement behavior across different simulation resolutions.
+
+- Time is internally tracked and used for step-based animation, performance evaluation, and metric logging.
+  - 24 steps (at 60 mins/step) = 1 simulated day  
+  - 720 steps ≈ 1 simulated month
