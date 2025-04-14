@@ -349,3 +349,5 @@ class CellularNetworkEnv(gym.Env):
 # print("Total users after: ", np.sum(env.car_grid))
 
  #%%
+
+print("Tutorial complete!")
