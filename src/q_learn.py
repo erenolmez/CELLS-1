@@ -40,9 +40,14 @@ action_counter = Counter()
 # === Hyperparameters ===
 alpha = 0.1
 gamma = 0.95
-epsilon = 0.2
 episodes = 750
 steps_per_episode = 30
+
+initial_epsilon = 1.0
+final_epsilon = 0.1
+decay_rate = 0.995
+
+epsilon = initial_epsilon
 
 # === Logs ===
 log = []  # place this before training starts
@@ -53,8 +58,8 @@ np.random.seed(SEED)
 random.seed(SEED)
 
 # === Training Loop ===
-env.reset()
 for ep in range(episodes):
+    env.reset()
     state = get_state(env)
     total_reward = 0
 
@@ -81,6 +86,9 @@ for ep in range(episodes):
         total_reward += reward
         action_counter[action] += 1
 
+    # After the episode ends:
+    epsilon = max(final_epsilon, epsilon * decay_rate)
+
     _, failures, redirects = env.check_coverage()
     log.append({
         "episode": ep,
@@ -88,7 +96,8 @@ for ep in range(episodes):
         "time_label": env.get_sim_time(),
         "failures": failures,
         "redirects": redirects,
-        "reward": total_reward
+        "reward": total_reward,
+        "epsilon": epsilon
     })
 
     if ep % 25 == 0:
