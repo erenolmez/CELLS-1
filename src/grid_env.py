@@ -348,3 +348,5 @@ env.animate_car_grid(steps=24, interval=500)
 print("Total users after: ", np.sum(env.car_grid))
 
  #%%
+
+print("Tutorial complete!")
