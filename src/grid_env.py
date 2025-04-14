@@ -185,6 +185,7 @@ class CellularNetworkEnv(gym.Env):
             np.random.seed(self._seed_value)
             random.seed(self._seed_value)
         
+        self.sim_time_hours = 0  # <-- Add this line to reset time
         self.place_antennas()
         self.place_users()
         return np.concatenate((self.car_grid.flatten(), self.antenna_grid.flatten()))
@@ -332,20 +333,20 @@ class CellularNetworkEnv(gym.Env):
 
 #%%
 # Test the environment
-env = CellularNetworkEnv()
-env.render()
-env.render_heatmaps()
-print("Total users before:", np.sum(env.car_grid))
+# env = CellularNetworkEnv()
+# env.render()
+# env.render_heatmaps()
+# print("Total users before:", np.sum(env.car_grid))
 
  #%%
 
 # Move users using Markov Chain
-env.move_users_markov_chain()
-print("\nAfter User Movement (Markov Chain):")
-env.render()
-env.render_heatmaps()
-env.animate_car_grid(steps=24, interval=500)
-print("Total users after: ", np.sum(env.car_grid))
+# env.move_users_markov_chain()
+# print("\nAfter User Movement (Markov Chain):")
+# env.render()
+# env.render_heatmaps()
+# env.animate_car_grid(steps=24, interval=500)
+# print("Total users after: ", np.sum(env.car_grid))
 
  #%%
 
