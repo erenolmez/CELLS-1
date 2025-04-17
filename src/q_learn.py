@@ -107,6 +107,7 @@ for ep in range(episodes):
         print(f"Episode {ep}: Reward = {total_reward:.3f}, Failures = {failures}, Redirects = {redirects}")
 
 print("\n✅ Training Complete")
+print("Number of unique state-action pairs learned:", len(q_table))
 
 # === Optional Visualization ===
 print("\n🎥 Animating user movement after training...")
