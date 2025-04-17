@@ -150,6 +150,11 @@ class CellularNetworkEnv(gym.Env):
         return covered_grid, failures, redirects
 
     def move_users_markov_chain(self):
+        """
+        Markov movement using *one* multinomial draw per cell:
+            category 0  – stay         (prob = 1 − p_move)
+            categories 1…k – neighbours (prob = p_move / k each)
+        """
         p_move = self.compute_dynamic_p_move()
         new_car_grid = np.zeros((self.rows, self.cols), dtype=int)
 
@@ -160,17 +165,20 @@ class CellularNetworkEnv(gym.Env):
                     continue
 
                 neighbors = self.neighbor_map[(r, c)]
-                n_neighbors = len(neighbors)
-                n_move = int(p_move * users)
-                n_stay = users - n_move
+                k = len(neighbors)
+                # Single multinomial draw — R‑style
+                move_counts = np.random.multinomial(
+                    users,
+                    [1.0 - p_move] + [p_move / k] * k if k else [1.0]
+                )
 
-                if n_neighbors > 0:
-                    move_distribution = np.random.multinomial(n_move, [1 / n_neighbors] * n_neighbors)
-                    for i, count in enumerate(move_distribution):
-                        nr, nc = neighbors[i]
-                        new_car_grid[nr, nc] += count
+                # 1) stayers
+                new_car_grid[r, c] += move_counts[0]
 
-                new_car_grid[r, c] += n_stay
+                # 2) movers to each neighbour
+                for idx, cnt in enumerate(move_counts[1:]):
+                    nr, nc = neighbors[idx]
+                    new_car_grid[nr, nc] += cnt
 
         self.car_grid = new_car_grid
 
@@ -333,20 +341,20 @@ class CellularNetworkEnv(gym.Env):
 
 #%%
 # Test the environment
-# env = CellularNetworkEnv()
-# env.render()
-# env.render_heatmaps()
-# print("Total users before:", np.sum(env.car_grid))
+env = CellularNetworkEnv()
+env.render()
+env.render_heatmaps()
+print("Total users before:", np.sum(env.car_grid))
 
  #%%
 
 # Move users using Markov Chain
-# env.move_users_markov_chain()
-# print("\nAfter User Movement (Markov Chain):")
-# env.render()
-# env.render_heatmaps()
-# env.animate_car_grid(steps=24, interval=500)
-# print("Total users after: ", np.sum(env.car_grid))
+env.move_users_markov_chain()
+print("\nAfter User Movement (Markov Chain):")
+env.render()
+env.render_heatmaps()
+env.animate_car_grid(steps=24, interval=500)
+print("Total users after: ", np.sum(env.car_grid))
 
  #%%
 print("Tutorial complete!")

@@ -1,240 +1,217 @@
 """
 Double DQN Training Script for CellularNetworkEnv
-================================================
-This file upgrades vanilla DQN to **Double DQN** **and** keeps the same
-visualisation tools you liked from `q_learn.py` (training curves **and** live
-user‑movement animation).
+=================================================
+• 73‑action space  (add / remove / no‑op)
+• Unique‑state tracking each step
+• Early stopping when failures stop improving
+• Works with CUDA or CPU
 Run:
-```bash
-python dqn_train.py
-```
+    python ddqn_train.py
 """
 
-import random
+from __future__ import annotations
+import random, hashlib
 from collections import deque
 from typing import Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import hashlib
 
 from grid_env import CellularNetworkEnv
 
-unique_states = set()
 
-def hash_state(state_vector):
-    # Round to reduce sensitivity, then hash
-    rounded = tuple(np.round(state_vector, decimals=3))
-    return hashlib.md5(str(rounded).encode()).hexdigest()
-
-# ──────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
 # 1.  Hyper‑parameters
-# ──────────────────────────────────────────────────────────────────────────────
-GAMMA = 0.99            # discount factor
-LR = 1e-3               # Adam learning rate
-BATCH_SIZE = 64
-BUFFER_SIZE = 50_000
-TARGET_UPDATE_FREQ = 500  # sync target net every N env steps
+# ─────────────────────────────────────────────
+GAMMA               = 0.99
+LR                  = 1e-3
+BATCH_SIZE          = 64
+BUFFER_SIZE         = 50_000
+TARGET_UPDATE_FREQ  = 500        # env steps
+EPISODES            = 3_000
+STEPS_PER_EPISODE   = 60
 
 EPSILON_START = 1.0
-EPSILON_END = 0.01
-EPSILON_DECAY = 0.0002   # keeps ε > 0.2 until ~1500 episodes
+EPSILON_END   = 0.01
+EPSILON_DECAY = 0.0002           # keeps ε > 0.2 until ~1500 eps
 
-EPISODES = 3000
-STEPS_PER_EPISODE = 60
 SEED = 42
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 2.  Action encoding helpers  (72 discrete actions)
-# ──────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# 2.  Action helpers   (6×6×2  +  no‑op  =  73)
+# ─────────────────────────────────────────────
+N_ROWS, N_COLS, N_OPS = 6, 6, 2
+N_ACTIONS = N_ROWS * N_COLS * N_OPS + 1    # 72 + 1
+NOOP_ID   = 72                             # final index
 
-def encode_action(r: int, c: int, op: int) -> int:
-    """(row, col, op) ➜ flat index 0‑71."""
-    return r * 12 + c * 2 + op
+def encode_action(r:int,c:int,op:int)->int:
+    """(row,col,op) ➜ 0–71"""
+    return r * (N_COLS*N_OPS) + c*N_OPS + op
 
-def decode_action(idx: int):
-    if idx == 72:
-        return None  # no-op
-    r = idx // 12
-    c = (idx % 12) // 2
-    op = idx % 2
+def decode_action(idx:int) -> Tuple[int,int,int] | None:
+    if idx == NOOP_ID:
+        return None        # do nothing
+    r = idx // (N_COLS*N_OPS)
+    c = (idx % (N_COLS*N_OPS)) // N_OPS
+    op = idx % N_OPS
     return r, c, op
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
 # 3.  Replay Buffer
-# ──────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
 class ReplayBuffer:
-    def __init__(self, capacity: int):
+    def __init__(self, capacity:int):
         self.buffer = deque(maxlen=capacity)
+    def push(self,*tr): self.buffer.append(tuple(tr))
+    def sample(self,k):
+        batch = random.sample(self.buffer,k)
+        s,a,r,s2,d = zip(*batch)
+        return (np.array(s),
+                np.array(a),
+                np.array(r, np.float32),
+                np.array(s2),
+                np.array(d, np.float32))
+    def __len__(self): return len(self.buffer)
 
-    def push(self, s, a, r, s2, d):
-        self.buffer.append((s, a, r, s2, d))
-
-    def sample(self, k):
-        batch = random.sample(self.buffer, k)
-        s, a, r, s2, d = zip(*batch)
-        return (np.array(s), np.array(a), np.array(r, dtype=np.float32),
-                np.array(s2), np.array(d, dtype=np.float32))
-
-    def __len__(self):
-        return len(self.buffer)
-
-# ──────────────────────────────────────────────────────────────────────────────
-# 4.  Neural Net
-# ──────────────────────────────────────────────────────────────────────────────
-class QNetwork(nn.Module):
-    def __init__(self, input_dim: int = 72, output_dim: int = 72):
+# ─────────────────────────────────────────────
+# 4.  Network
+# ─────────────────────────────────────────────
+class QNet(nn.Module):
+    def __init__(self, inp:int=72, out:int=N_ACTIONS):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(input_dim, 128), nn.ReLU(),
-            nn.Linear(128, 64), nn.ReLU(),
-            nn.Linear(64, output_dim)
+            nn.Linear(inp,128), nn.ReLU(),
+            nn.Linear(128,64),  nn.ReLU(),
+            nn.Linear(64,out)
         )
-    def forward(self, x):
-        return self.net(x)
+    def forward(self,x): return self.net(x)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 5.  Env & seeding
-# ──────────────────────────────────────────────────────────────────────────────
-
+# ─────────────────────────────────────────────
+# 5.  Utils
+# ─────────────────────────────────────────────
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+def eps_threshold(step:int):
+    return EPSILON_END + (EPSILON_START-EPSILON_END)*np.exp(-EPSILON_DECAY*step)
+
+def hash_state(vec:np.ndarray):
+    """Hash rounded state vector to track exploration."""
+    return hashlib.md5(np.round(vec,3).tobytes()).hexdigest()
+
+# ─────────────────────────────────────────────
+# 6.  Environment & seeding
+# ─────────────────────────────────────────────
+random.seed(SEED); np.random.seed(SEED); torch.manual_seed(SEED)
 env = CellularNetworkEnv()
-env.seed(SEED)
-np.random.seed(SEED)
-random.seed(SEED)
+env.seed(SEED)                         # seed once only
 
-dqn = QNetwork().to(device)          # policy net
-target_dqn = QNetwork().to(device)   # target net
-target_dqn.load_state_dict(dqn.state_dict())
+policy_net = QNet().to(device)
+target_net = QNet().to(device)
+target_net.load_state_dict(policy_net.state_dict())
+target_net.eval()
 
-a_optimizer = optim.Adam(dqn.parameters(), lr=LR)
-buffer = ReplayBuffer(BUFFER_SIZE)
+optimizer = optim.Adam(policy_net.parameters(), lr=LR)
+replay    = ReplayBuffer(BUFFER_SIZE)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 6.  Training Loop – Double DQN
-# ──────────────────────────────────────────────────────────────────────────────
-
-epsilon = EPSILON_START
-step_counter = 0
+# ─────────────────────────────────────────────
+# 7.  Training loop  (Double DQN)
+# ─────────────────────────────────────────────
+unique_states = set()
 log = []
 
-best_failures = float('inf')   # lowest failure count seen so far
-patience      = 300            # how many episodes with no new best before stopping
-wait          = 0              # episodes since last improvement
+best_fail, patience, wait = float('inf'), 300, 0
+step_ctr = 0
 
 for ep in range(EPISODES):
-    obs = env.reset()
+    obs   = env.reset()
     state = torch.tensor(obs, dtype=torch.float32, device=device)
     ep_reward = 0.0
 
     for _ in range(STEPS_PER_EPISODE):
-        step_counter += 1
-        # ε‑greedy action selection (policy net)
-        if random.random() < epsilon:
-            a_idx = random.randrange(72)
+        step_ctr += 1
+        # ε‑greedy
+        if random.random() < eps_threshold(step_ctr):
+            a_id = random.randrange(N_ACTIONS)
         else:
             with torch.no_grad():
-                a_idx = dqn(state).argmax().item()
+                a_id = int(policy_net(state).argmax().item())
 
-        a = decode_action(a_idx)
-        obs2, r, done, _ = env.step(a)
-        next_state = torch.tensor(obs2, dtype=torch.float32, device=device)
-        buffer.push(state.cpu().numpy(), a_idx, r, next_state.cpu().numpy(), done)
+        # take action
+        next_obs, reward, done, _ = env.step(decode_action(a_id))
+        next_state = torch.tensor(next_obs, dtype=torch.float32, device=device)
 
-        # ▶︎ Track every visited state  (ADD THIS LINE)
+        # track exploration & store transition
         unique_states.add(hash_state(next_state.cpu().numpy()))
+        replay.push(state.cpu().numpy(), a_id, reward,
+                    next_state.cpu().numpy(), done)
 
-         # store transition
-        buffer.push(state.cpu().numpy(), a_idx, r,
-        next_state.cpu().numpy(), done)
-    
         state = next_state
-        ep_reward += r
+        ep_reward += reward
 
-        # Learn
-        if len(buffer) >= BATCH_SIZE:
-            s, a_b, r_b, s2, d_b = buffer.sample(BATCH_SIZE)
-            s = torch.tensor(s, dtype=torch.float32, device=device)
-            a_b = torch.tensor(a_b, dtype=torch.int64, device=device).unsqueeze(1)
-            r_b = torch.tensor(r_b, dtype=torch.float32, device=device).unsqueeze(1)
+        # learn if buffer ready
+        if len(replay) >= BATCH_SIZE:
+            s,a,r,s2,d = replay.sample(BATCH_SIZE)
+            s  = torch.tensor(s,  dtype=torch.float32, device=device)
+            a  = torch.tensor(a,  dtype=torch.int64,  device=device).unsqueeze(1)
+            r  = torch.tensor(r,  dtype=torch.float32, device=device).unsqueeze(1)
             s2 = torch.tensor(s2, dtype=torch.float32, device=device)
-            d_b = torch.tensor(d_b, dtype=torch.float32, device=device).unsqueeze(1)
+            d  = torch.tensor(d,  dtype=torch.float32, device=device).unsqueeze(1)
 
-            # Double DQN targets
-            a_sel = dqn(s2).argmax(1, keepdim=True)
+            q    = policy_net(s).gather(1, a)
             with torch.no_grad():
-                q_next = target_dqn(s2).gather(1, a_sel)
-                td_target = r_b + (1 - d_b) * GAMMA * q_next
+                a_sel  = policy_net(s2).argmax(1, keepdim=True)
+                q_next = target_net(s2).gather(1, a_sel)
+                target = r + (1-d)*GAMMA*q_next
 
-            q_curr = dqn(s).gather(1, a_b)
-            loss = nn.MSELoss()(q_curr, td_target)
+            loss = nn.functional.mse_loss(q, target)
+            optimizer.zero_grad(); loss.backward(); optimizer.step()
 
-            a_optimizer.zero_grad()
-            loss.backward()
-            a_optimizer.step()
+        # target‑net update
+        if step_ctr % TARGET_UPDATE_FREQ == 0:
+            target_net.load_state_dict(policy_net.state_dict())
 
-        # Sync target net
-        if step_counter % TARGET_UPDATE_FREQ == 0:
-            target_dqn.load_state_dict(dqn.state_dict())
-
-    # ε decay per episode
-    epsilon = EPSILON_END + (EPSILON_START - EPSILON_END) * np.exp(-EPSILON_DECAY * ep)
-
-    # Log metrics
+    # episode summary
     _, fails, reds = env.check_coverage()
-    log.append({"episode": ep, "reward": ep_reward, "fails": fails, "reds": reds, "eps": epsilon})
+    log.append({"ep":ep, "rew":ep_reward, "fail":fails, "red":reds})
 
-    # --- Early‑stopping check ---------------------------------
-    if fails < best_failures:
-        best_failures = fails
-        wait = 0                     # reset patience
-    else:
-        wait += 1
-
+    # early stopping
+    if fails < best_fail: best_fail, wait = fails, 0
+    else:                 wait += 1
     if wait >= patience:
-        print(f"↪️  Early stop at episode {ep} – failures plateaued "
-              f"(best = {best_failures}).")
+        print(f"↪️  Early stop at ep {ep}, best failures {best_fail}")
         break
-    # ----------------------------------------------------------
-    # if ep % 25 == 0:
-        # print(f"Ep {ep:3d} | R {ep_reward:7.3f} | F {fails:4d} | ε {epsilon:.3f}")
-    if ep == EPISODES - 1:
-        print(f"✅ Training complete — final reward: {ep_reward:.3f}, failures: {fails}, epsilon: {epsilon:.3f}")
 
+# ─────────────────────────────────────────────
+# 8.  Results
+# ─────────────────────────────────────────────
 print("\n✅ Double DQN training complete.")
-print(f"\n📊 Unique states visited during training: {len(unique_states)}")
-print(f"📦 Replay buffer size    : {len(buffer)}")
-print(f"💻 Training was done on: {device}")
-
-# ──────────────────────────────────────────────────────────────────────────────
-# 7.  Plot training curves
-# ──────────────────────────────────────────────────────────────────────────────
+print(f"📊 unique states visited : {len(unique_states)}")
+print(f"📦 replay buffer size    : {len(replay)}")
+print(f"💻 device                : {device}")
 
 df = pd.DataFrame(log)
-plt.figure(figsize=(12, 5))
-plt.plot(df['episode'], df['reward'], label='Reward')
-plt.plot(df['episode'], df['fails'], label='Failures')
-plt.plot(df['episode'], df['reds'], label='Redirects')
-plt.xlabel('Episode')
-plt.grid(True); plt.legend(); plt.tight_layout(); plt.show()
+plt.figure(figsize=(12,5))
+plt.plot(df.ep, df.rew,  label="Reward")
+plt.plot(df.ep, df.fail, label="Failures")
+plt.plot(df.ep, df.red,  label="Redirects")
+plt.xlabel("Episode"); plt.legend(); plt.grid(True); plt.tight_layout(); plt.show()
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 8.  Quick deterministic rollout + animation
-# ──────────────────────────────────────────────────────────────────────────────
-print("\n🎥 Animating user movement after training...")
-# Show 24 simulated hours (one per env.step)
-obs = env.reset()
-state = torch.tensor(obs, dtype=torch.float32, device=device)
-for t in range(24):
+# ─────────────────────────────────────────────
+# 9.  Quick deterministic rollout + animation
+# ─────────────────────────────────────────────
+print("\n🎥 Animating learned policy…")
+env.reset()
+state = torch.tensor(np.concatenate([env.car_grid.flatten(),
+                                     env.antenna_grid.flatten()]),
+                     dtype=torch.float32, device=device)
+for _ in range(24):    # 24 env steps = ~1 day in your sim
     with torch.no_grad():
-        a_idx = dqn(state).argmax().item()
-    a = decode_action(a_idx)
-    obs2, _, _, _ = env.step(a)
-    state = torch.tensor(obs2, dtype=torch.float32, device=device)
-# Use built‑in heat‑map animation
+        a_id = int(policy_net(state).argmax().item())
+    next_obs,_,_,_ = env.step(decode_action(a_id))
+    state = torch.tensor(next_obs, dtype=torch.float32, device=device)
+
 env.animate_car_grid(steps=24, interval=400)
