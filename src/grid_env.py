@@ -91,6 +91,20 @@ class CellularNetworkEnv(gym.Env):
                             neighbors.append((nr, nc))
                 self.neighbor_map[(r, c)] = neighbors
 
+    def print_neighbor_grid(self):
+        """
+        Prints a grid where each cell contains the number of neighbors for that cell.
+        Useful for visually verifying the neighbor map.
+        """
+        neighbor_grid = np.zeros((self.rows, self.cols), dtype=int)
+
+        for r in range(self.rows):
+            for c in range(self.cols):
+                neighbor_grid[r, c] = len(self.neighbor_map[(r, c)])
+
+        print("\nNeighbor Grid (Number of Neighbors per Cell):")
+        print(neighbor_grid)
+
     def place_antennas(self):
         """Randomly distribute antennas across the grid (multiple per cell allowed)."""
         self.antenna_grid = np.zeros((self.rows, self.cols), dtype=int)
@@ -169,7 +183,7 @@ class CellularNetworkEnv(gym.Env):
                 # Single multinomial draw — R‑style
                 move_counts = np.random.multinomial(
                     users,
-                    [1.0 - p_move] + [p_move / k] * k if k else [1.0]
+                    [1.0 - p_move] + [p_move / k] * k 
                 )
 
                 # 1) stayers
@@ -345,7 +359,7 @@ env = CellularNetworkEnv()
 env.render()
 env.render_heatmaps()
 print("Total users before:", np.sum(env.car_grid))
-
+env.print_neighbor_grid()
  #%%
 
 # Move users using Markov Chain
