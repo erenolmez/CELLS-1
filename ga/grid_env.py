@@ -224,16 +224,14 @@ class CellularNetworkEnv(gym.Env):
         return reward
 
     def step(self, action):
-        r, c, op = action
-
-        if op == 0:
-            if np.sum(self.antenna_grid) < self.max_antennas:
+        # ---------- antenna update ----------
+        if action is not None:
+            r, c, op = action
+            if op == 0 and np.sum(self.antenna_grid) < self.max_antennas:
                 self.antenna_grid[r, c] += 1
-        elif op == 1:
-            if self.antenna_grid[r, c] > 0:
+            elif op == 1 and self.antenna_grid[r, c] > 0:
                 self.antenna_grid[r, c] -= 1
-
-        # Simulate user movement
+        # ---------- user movement ----------
         self.move_users_markov_chain()
 
         # Evaluate coverage
@@ -355,20 +353,20 @@ class CellularNetworkEnv(gym.Env):
 
 #%%
 # Test the environment
-env = CellularNetworkEnv()
-env.render()
-env.render_heatmaps()
-print("Total users before:", np.sum(env.car_grid))
-env.print_neighbor_grid()
- #%%
+# env = CellularNetworkEnv()
+# env.render()
+# env.render_heatmaps()
+# print("Total users before:", np.sum(env.car_grid))
+# env.print_neighbor_grid()
+#  #%%
 
-# Move users using Markov Chain
-env.move_users_markov_chain()
-print("\nAfter User Movement (Markov Chain):")
-env.render()
-env.render_heatmaps()
-env.animate_car_grid(steps=240, interval=500)
-print("Total users after: ", np.sum(env.car_grid))
+# # Move users using Markov Chain
+# env.move_users_markov_chain()
+# print("\nAfter User Movement (Markov Chain):")
+# env.render()
+# env.render_heatmaps()
+# env.animate_car_grid(steps=240, interval=500)
+# print("Total users after: ", np.sum(env.car_grid))
 
- #%%
-print("Tutorial complete!")
+#  #%%
+# print("Tutorial complete!")
