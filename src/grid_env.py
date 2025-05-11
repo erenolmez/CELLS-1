@@ -168,7 +168,9 @@ class CellularNetworkEnv(gym.Env):
         Markov movement using *one* multinomial draw per cell:
             category 0  – stay         (prob = 1 − p_move)
             categories 1…k – neighbours (prob = p_move / k each)
+        For edge/corner cells, invalid directions contribute to stay probability.
         """
+
         p_move = self.compute_dynamic_p_move()
         new_car_grid = np.zeros((self.rows, self.cols), dtype=int)
 
@@ -180,21 +182,21 @@ class CellularNetworkEnv(gym.Env):
 
                 neighbors = self.neighbor_map[(r, c)]
                 k = len(neighbors)
-                # Single multinomial draw — R‑style
-                move_counts = np.random.multinomial(
-                    users,
-                    [1.0 - p_move] + [p_move / k] * k 
-                )
+                missing = 8 - k
+                stay_prob = 1.0 - p_move + (missing * (p_move / 8))
+                move_probs = [stay_prob] + [p_move / 8] * k
 
-                # 1) stayers
+                move_counts = np.random.multinomial(users, move_probs)
+
+                 # 1) stayers
                 new_car_grid[r, c] += move_counts[0]
 
                 # 2) movers to each neighbour
-                for idx, cnt in enumerate(move_counts[1:]):
+                for idx, count in enumerate(move_counts[1:]):
                     nr, nc = neighbors[idx]
-                    new_car_grid[nr, nc] += cnt
+                    new_car_grid[nr, nc] += count
 
-        self.car_grid = new_car_grid
+        self.car_grid = new_car_grid   
 
     def update_after_user_movement(self):
             """ Update coverage and failures after user movement. """
@@ -353,22 +355,51 @@ class CellularNetworkEnv(gym.Env):
         anim = FuncAnimation(fig, update, frames=steps, interval=interval, blit=False, repeat=False)
         plt.show()
 
+    def animate_user_histogram(self, steps=240, interval=200):
+        """
+        Animate a histogram showing the number of users per cell over time.
+        Each bar represents one cell in the grid (flattened index 0 to N-1).
+        """
+        fig, ax = plt.subplots(figsize=(10, 5))
+
+        # Precompute and freeze user states over time
+        user_history = []
+        for _ in range(steps):
+            self.move_users_markov_chain()
+            user_history.append(self.car_grid.flatten().copy())  # Freeze state snapshot
+
+        user_data = np.array(user_history)
+        num_cells = self.rows * self.cols
+
+        bars = ax.bar(np.arange(num_cells), user_data[0], color='skyblue')
+        title = ax.set_title("User Distribution Histogram - Step 0")
+        ax.set_ylim(0, np.max(user_data) + 50)
+        ax.set_xlabel("Grid Cell Index (0 to {})".format(num_cells - 1))
+        ax.set_ylabel("Users per Cell")
+
+        def update(frame):
+            for bar, height in zip(bars, user_data[frame]):
+                bar.set_height(height)
+            title.set_text(f"User Distribution Histogram - Step {frame}")
+            return bars
+
+        anim = FuncAnimation(fig, update, frames=steps, interval=interval, blit=False, repeat=False)
+        plt.show()
+
 #%%
 # Test the environment
 env = CellularNetworkEnv()
-env.render()
-env.render_heatmaps()
-print("Total users before:", np.sum(env.car_grid))
-env.print_neighbor_grid()
+# env.render()
+# env.render_heatmaps()
+# print("Total users before:", np.sum(env.car_grid))
+# env.print_neighbor_grid()
  #%%
 
 # Move users using Markov Chain
-env.move_users_markov_chain()
-print("\nAfter User Movement (Markov Chain):")
-env.render()
-env.render_heatmaps()
-env.animate_car_grid(steps=240, interval=500)
-print("Total users after: ", np.sum(env.car_grid))
-
- #%%
-print("Tutorial complete!")
+# env.move_users_markov_chain()
+# print("\nAfter User Movement (Markov Chain):")
+# env.render()
+# env.render_heatmaps()
+# env.animate_car_grid(steps=240, interval=500)
+# print("Total users after: ", np.sum(env.car_grid))
+env.animate_user_histogram(steps=240, interval=200)
