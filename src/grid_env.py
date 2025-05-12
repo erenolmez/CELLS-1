@@ -36,9 +36,16 @@ class CellularNetworkEnv(gym.Env):
             spaces.Discrete(self.cols),
             spaces.Discrete(2)  # 0 = add, 1 = remove
         ))
+
+
         self.antenna_capacity = antenna_capacity
-        self.num_antennas = self.total_users // self.antenna_capacity
-        self.max_antennas = self.total_users // self.antenna_capacity
+        min_antenna_by_capacity = self.total_users / self.antenna_capacity
+        min_antenna_by_coverage = self.num_cells / ((2 * self.coverage_radius + 1) ** 2)
+        self.num_antennas = int(min_antenna_by_capacity) 
+        self.max_antennas = int(np.ceil(max(min_antenna_by_capacity, min_antenna_by_coverage) * 1.3))
+
+        # self.num_antennas = self.total_users // self.antenna_capacity
+        # self.max_antennas = self.total_users // self.antenna_capacity
         self.place_antennas()
         
         # Place users randomly
