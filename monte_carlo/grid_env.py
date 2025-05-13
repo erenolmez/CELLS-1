@@ -8,12 +8,13 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.patches import Circle
 from matplotlib import gridspec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import math
 
 # %%
 class CellularNetworkEnv(gym.Env):
     """ Gym environment for optimizing antenna placement and handling failures. """
 
-    def __init__(self, rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60):
+    def __init__(self, rows=6, cols=6, total_users=5000, antenna_capacity=300, time_step=60):
         super(CellularNetworkEnv, self).__init__()
         self.time_step = time_step  # real-time duration per step (in minutes)
         self.sim_time_hours = 0
@@ -36,16 +37,13 @@ class CellularNetworkEnv(gym.Env):
             spaces.Discrete(self.cols),
             spaces.Discrete(2)  # 0 = add, 1 = remove
         ))
-
-
         self.antenna_capacity = antenna_capacity
-        min_antenna_by_capacity = self.total_users / self.antenna_capacity
-        min_antenna_by_coverage = self.num_cells / ((2 * self.coverage_radius + 1) ** 2)
-        self.num_antennas = int(min_antenna_by_capacity) 
-        self.max_antennas = int(np.ceil(max(min_antenna_by_capacity, min_antenna_by_coverage) * 1.3))
-
-        # self.num_antennas = self.total_users // self.antenna_capacity
-        # self.max_antennas = self.total_users // self.antenna_capacity
+        self.num_antennas = self.total_users // self.antenna_capacity
+        self.avg_users_per_cell = total_users / (rows * cols)
+        self.users_per_antenna_area = 9 * self.avg_users_per_cell
+        self.estimated_antennas = math.ceil(self.total_users / self.users_per_antenna_area)
+        self.max_antennas = math.ceil(self.num_antennas* 1.3)
+        print(self.max_antennas)
         self.place_antennas()
         
         # Place users randomly
@@ -128,62 +126,59 @@ class CellularNetworkEnv(gym.Env):
         flat_grid = np.random.multinomial(self.total_users, [1 / self.num_cells] * self.num_cells)
         self.car_grid = np.array(flat_grid).reshape((self.rows, self.cols))
         print(self.car_grid)
-
+    
     def check_coverage(self):
-        """
-        Returns covered_grid (0‑100 %), failures, redirects.
-        Redirects count only when a user is forced to skip one or more
-        *saturated* antennas (capacity = 0) before finding free capacity.
-        """
         covered_grid = np.zeros((self.rows, self.cols), dtype=int)
         failures = 0
         redirects = 0
         antenna_load = np.zeros((self.rows, self.cols), dtype=int)
 
-        # Pre‑compute neighbour list ordered by Manhattan distance (local first)
-        offsets = [(0,0), (-1,0), (1,0), (0,-1), (0,1),
-                (-1,-1), (-1,1), (1,-1), (1,1)]
-
         for r in range(self.rows):
             for c in range(self.cols):
-                users_in_cell   = self.car_grid[r, c]
+                users_in_cell = self.car_grid[r, c]
                 remaining_users = users_in_cell
-                users_served    = 0
-                saturated_seen  = False          # ← flag for redirect counting
+                users_served = 0
+                redirected_users = 0
 
-                for dr, dc in offsets:
-                    nr, nc = r + dr, c + dc
-                    if not (0 <= nr < self.rows and 0 <= nc < self.cols):
-                        continue
+                # 🔁 Only consider self and 8 neighbors
+                candidates = []
+                for dr in [-1, 0, 1]:
+                    for dc in [-1, 0, 1]:
+                        nr, nc = r + dr, c + dc
+                        if 0 <= nr < self.rows and 0 <= nc < self.cols:
+                            dist = abs(dr) + abs(dc)  # Manhattan distance
+                            candidates.append(((nr, nc), dist))
 
-                    # capacity & load
-                    cap_here   = self.antenna_grid[nr, nc] * self.antenna_capacity
-                    free_here  = max(0, cap_here - antenna_load[nr, nc])
+                # 🔢 Sort by distance (own cell first, then adjacent ones)
+                candidates.sort(key=lambda x: x[1])
 
-                    if free_here == 0:
-                        # antenna present and full ⇒ mark that we skipped a saturated one
-                        if cap_here > 0:
-                            saturated_seen = True
-                        continue
-
+                for (nr, nc), dist in candidates:
                     if remaining_users == 0:
                         break
 
-                    served = min(free_here, remaining_users)
-                    antenna_load[nr, nc] += served
-                    remaining_users      -= served
-                    users_served         += served
+                    max_capacity = self.antenna_grid[nr, nc] * self.antenna_capacity
+                    free_capacity = max(0, max_capacity - antenna_load[nr, nc])
 
-                    # redirect counted **only** if some saturated antenna was skipped
-                    if saturated_seen:
-                        redirects += served
+                    if free_capacity > 0:
+                        served = min(free_capacity, remaining_users)
+                        antenna_load[nr, nc] += served
+                        remaining_users -= served
+                        users_served += served
+
+                        # Count redirects only if not served by own cell
+                        if dist > 0:
+                            redirected_users += served
 
                 failures += remaining_users
 
                 if users_in_cell > 0:
-                    covered_grid[r, c] = int(100 * users_served / users_in_cell)
+                    covered_grid[r, c] = int((users_served / users_in_cell) * 100)
+                else:
+                    covered_grid[r, c] = 0
 
+                redirects += redirected_users
         return covered_grid, failures, redirects
+        
 
     def move_users_markov_chain(self):
         """
@@ -408,6 +403,75 @@ class CellularNetworkEnv(gym.Env):
         anim = FuncAnimation(fig, update, frames=steps, interval=interval, blit=False, repeat=False)
         plt.show()
 
+    def evaluate_antenna_placement(self, steps=240):
+        total_failures = 0
+        total_redirects = 0
+
+        for _ in range(steps):
+            self.move_users_markov_chain()
+            _, failures, redirects = self.check_coverage()
+            total_failures += failures
+            total_redirects += redirects
+            self.sim_time_hours += 1
+
+        return total_failures, total_redirects
+
+    def monte_carlo_antenna_optimization(self, num_trials=100, sim_steps=240):
+        best_reward = -float('inf')
+        best_config = None
+
+        self.place_users()
+        initial_users = self.car_grid.copy()
+
+        for trial in range(num_trials):
+            self.car_grid = initial_users.copy()  # Ensure same users across trials
+            self.sim_time_hours = 0
+            self.antenna_grid = np.zeros((self.rows, self.cols), dtype=int)
+
+            # Random antenna configuration
+        
+            for _ in range(self.num_antennas):
+                r = np.random.randint(0, self.rows)
+                c = np.random.randint(0, self.cols)
+                self.antenna_grid[r, c] += 1
+
+            total_reward = 0
+            temp_users = self.car_grid.copy()
+            for step in range(sim_steps):
+                self.car_grid = temp_users.copy()
+                obs, reward, done, _ = self.step((0, 0, 2))  # No-op: avoid modifying antennas
+                total_reward += reward
+                temp_users=self.car_grid.copy()
+
+            avg_reward = total_reward / sim_steps
+
+            if avg_reward > best_reward:
+                best_reward = avg_reward
+                best_config = self.antenna_grid.copy()
+
+            print(f"Trial {trial + 1}/{num_trials}, Avg Reward: {avg_reward:.4f}")
+
+        print("\n✅ Best Avg Reward: \n", best_reward)
+        print("🛰️ Best Antenna Configuration:\n", best_config)
+        print(self.num_antennas)
+
+        # Optionally set environment to best config
+        self.antenna_grid = best_config
+        self.render_heatmaps()
+    def evaluate_antenna_placement(env, steps=240):
+        """Simulate user movement and record failures and redirects over time."""
+        total_failures = 0
+        total_redirects = 0
+
+        for _ in range(steps):
+            env.move_users_markov_chain()
+            _, failures, redirects = env.check_coverage()
+            total_failures += failures
+            total_redirects += redirects
+            env.sim_time_hours += 1  # Advance time
+
+        return total_failures, total_redirects
+
 #%%
 # Test the environment
 env = CellularNetworkEnv()
@@ -422,6 +486,13 @@ env = CellularNetworkEnv()
 # print("\nAfter User Movement (Markov Chain):")
 # env.render()
 # env.render_heatmaps()
-env.animate_car_grid(steps=240, interval=500)
+#env.render()
+#env.animate_car_grid(steps=240, interval=500)
+env.monte_carlo_antenna_optimization()
+[fail, redir] = env.evaluate_antenna_placement()
+print (fail/10,redir/10)
 # print("Total users after: ", np.sum(env.car_grid))
 # env.animate_user_histogram(steps=240, interval=200)
+
+
+ 
