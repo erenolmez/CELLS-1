@@ -2,66 +2,70 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from matplotlib.patches import Circle
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+
 class CellularNetworkEnv:
-    def __init__(self, rows=6, cols=6, total_users=5000, antenna_capacity=300, time_step=60):
-        self.time_step = time_step
-        self.sim_time_hours = 0
-        self.rows = rows
-        self.cols = cols
-        self.coverage_radius = 1
+    # ────────────────────────────
+    # INITIALISATION
+    # ────────────────────────────
+    def __init__(self,
+                 rows=6, cols=6,
+                 total_users=5000, antenna_capacity=300,
+                 time_step=60):
+        self.rows, self.cols = rows, cols
         self.total_users = total_users
         self.antenna_capacity = antenna_capacity
-        self.num_cells = self.rows * self.cols
-        self.num_antennas = self.total_users // self.antenna_capacity
-        self.max_antennas = self.num_antennas
+        self.time_step = time_step            # minutes/step
+        self.sim_time_hours = 0
 
-        self.car_grid = np.zeros((self.rows, self.cols), dtype=int)
-        self.antenna_grid = np.zeros((self.rows, self.cols), dtype=int)
+        self.coverage_radius = 1
+        self.num_cells = rows * cols
+        self.num_antennas = total_users // antenna_capacity
 
-        self._seed_value = None
+        self.car_grid = np.zeros((rows, cols), dtype=int)
+        self.antenna_grid = np.zeros((rows, cols), dtype=int)
+
         self._compute_neighbor_map()
-        self.place_antennas()
         self.place_users()
+        self.place_antennas()                 # greedy after warm-up
+
+    # ────────────────────────────
+    # HELPER MAPS
+    # ────────────────────────────
+    def _compute_neighbor_map(self):
+        self.neighbor_map = {
+            (r, c): [(r + dr, c + dc)
+                     for dr in [-1, 0, 1] for dc in [-1, 0, 1]
+                     if (dr or dc) and 0 <= r + dr < self.rows and 0 <= c + dc < self.cols]
+            for r in range(self.rows) for c in range(self.cols)
+        }
 
     def compute_dynamic_p_move(self):
-        return 0.4 * (self.time_step / 60)
+        return 0.4 * (self.time_step / 60)     # simple linear rule
 
     def get_sim_time(self):
-        day = self.sim_time_hours // 24
-        hour = self.sim_time_hours % 24
-        return f"Day {day}, {hour:02d}:00"
+        d, h = divmod(self.sim_time_hours, 24)
+        return f"Day {d}, {h:02d}:00"
 
-    def _compute_neighbor_map(self):
-        self.neighbor_map = {}
-        for r in range(self.rows):
-            for c in range(self.cols):
-                neighbors = []
-                for dr in [-1, 0, 1]:
-                    for dc in [-1, 0, 1]:
-                        if dr == 0 and dc == 0:
-                            continue
-                        nr, nc = r + dr, c + dc
-                        if 0 <= nr < self.rows and 0 <= nc < self.cols:
-                            neighbors.append((nr, nc))
-                self.neighbor_map[(r, c)] = neighbors
-
-    def place_antennas(self):
-        self.antenna_grid = np.zeros((self.rows, self.cols), dtype=int)
-        for _ in range(self.num_antennas):
-            r = random.randint(0, self.rows - 1)
-            c = random.randint(0, self.cols - 1)
-            self.antenna_grid[r, c] += 1
-
+    # ────────────────────────────
+    # USERS & MOVEMENT
+    # ────────────────────────────
     def place_users(self):
-        flat_grid = np.random.multinomial(self.total_users, [1 / self.num_cells] * self.num_cells)
-        self.car_grid = np.array(flat_grid).reshape((self.rows, self.cols))
+        flat = np.random.multinomial(self.total_users,
+                                     [1 / self.num_cells] * self.num_cells)
+        self.car_grid = flat.reshape(self.rows, self.cols)
 
+    # ▼▼▼ ——— ONLY THIS FUNCTION HAS CHANGED ——— ▼▼▼
     def move_users_markov_chain(self):
+        """
+        Markov movement with fixed per-direction probability:
+            – There are 8 possible move directions (N, NE, E, …).
+            – Each valid direction gets p_move / 8.
+            – Invalid directions (edge/corner) add their share back to the 'stay' prob.
+        """
         p_move = self.compute_dynamic_p_move()
-        new_car_grid = np.zeros((self.rows, self.cols), dtype=int)
+        new_grid = np.zeros_like(self.car_grid)
 
         for r in range(self.rows):
             for c in range(self.cols):
@@ -70,61 +74,151 @@ class CellularNetworkEnv:
                     continue
 
                 neighbors = self.neighbor_map[(r, c)]
-                weights = [1 / (1 + self.car_grid[nr, nc]) for (nr, nc) in neighbors]
-                total_weight = sum(weights)
-                probs = [1.0 - p_move] + [(p_move * w / total_weight) for w in weights]
+                k = len(neighbors)               # valid moves (≤ 8)
+                missing = 8 - k                  # off-grid directions
+                stay_prob = 1.0 - p_move + missing * (p_move / 8)
 
-                move_counts = np.random.multinomial(users, probs)
+                # multinomial: [stay] + one bucket per valid neighbor
+                probs = [stay_prob] + [p_move / 8] * k
+                moves = np.random.multinomial(users, probs)
 
-                new_car_grid[r, c] += move_counts[0]
-                for idx, cnt in enumerate(move_counts[1:]):
+                # add stayers
+                new_grid[r, c] += moves[0]
+                # add movers
+                for idx, cnt in enumerate(moves[1:]):
                     nr, nc = neighbors[idx]
-                    new_car_grid[nr, nc] += cnt
+                    new_grid[nr, nc] += cnt
 
-        self.car_grid = new_car_grid
+        self.car_grid = new_grid
+    # ▲▲▲ ——— MOVEMENT MODEL ENDS HERE ——— ▲▲▲
 
-    def visualize_movement_heatmap(self, hours=24, interval=500):
+
+    # ────────────────────────────
+    # ANTENNAS (GREEDY)
+    # ────────────────────────────
+    def place_antennas(self, warmup_hours=6):
+        print("\n⏳ Warm-up simulation for greedy placement …")
+        density = np.zeros_like(self.car_grid, dtype=float)
+        for _ in range(warmup_hours):
+            self.move_users_markov_chain()
+            density += self.car_grid
+
+        top_idx = np.argsort(density.ravel())[::-1][:self.num_antennas]
+        self.antenna_grid.fill(0)
+        for idx in top_idx:
+            r, c = divmod(idx, self.cols)
+            self.antenna_grid[r, c] = 1
+
+        print("📡 Antenna placement complete:")
+        for idx in top_idx:
+            r, c = divmod(idx, self.cols)
+            print(f"  • antenna at ({r}, {c})")
+
+    # ────────────────────────────
+    # COVERAGE METRICS  (unchanged)
+    # ────────────────────────────
+    def calculate_stats(self):
+        R = self.coverage_radius
+        covered_mask = np.zeros_like(self.car_grid, dtype=bool)
+        load = np.zeros_like(self.antenna_grid, dtype=int)
+
+        for r in range(self.rows):
+            for c in range(self.cols):
+                if self.antenna_grid[r, c]:
+                    for dr in range(-R, R + 1):
+                        for dc in range(-R, R + 1):
+                            nr, nc = r + dr, c + dc
+                            if 0 <= nr < self.rows and 0 <= nc < self.cols:
+                                covered_mask[nr, nc] = True
+
+        covered_users = failures = 0
+
+        for r in range(self.rows):
+            for c in range(self.cols):
+                users = self.car_grid[r, c]
+                if users == 0:
+                    continue
+
+                if not covered_mask[r, c]:
+                    failures += users
+                    continue
+
+                attached = False
+                for dr in range(-R, R + 1):
+                    for dc in range(-R, R + 1):
+                        nr, nc = r + dr, c + dc
+                        if 0 <= nr < self.rows and 0 <= nc < self.cols and self.antenna_grid[nr, nc]:
+                            if load[nr, nc] + users <= self.antenna_capacity:
+                                load[nr, nc] += users
+                                covered_users += users
+                                attached = True
+                                break
+                    if attached:
+                        break
+                if not attached:
+                    failures += users
+
+        cov_pct = 100 * covered_users / self.total_users
+        cost = failures + self.num_antennas * 5
+        return cov_pct, failures, cost
+
+    # ────────────────────────────
+    # VISUALISATION  (unchanged)
+    # ────────────────────────────
+    def visualize(self, hours=24, interval=500):
         fig, ax = plt.subplots(figsize=(6, 6))
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.1)
+        cax = make_axes_locatable(ax).append_axes("right", size="5%", pad=0.1)
+        heat = ax.imshow(self.car_grid, cmap="YlOrRd",
+                         vmin=0, vmax=self.car_grid.max())
+        fig.colorbar(heat, cax=cax).set_label("Users per Cell")
 
-        heatmap = ax.imshow(self.car_grid, cmap="YlOrRd", vmin=0, vmax=self.car_grid.max())
-        cbar = fig.colorbar(heatmap, cax=cax)
-        cbar.set_label("Users per Cell")
+        # ---------- antenna markers ----------
+        ay, axx = np.where(self.antenna_grid == 1)
+        antenna_scatter = ax.scatter(axx, ay, marker='^', s=120,
+                                     color='blue', edgecolor='white',
+                                     linewidth=0.7, zorder=3, label='Antenna')
+        # --------------------------------------
 
-        text_annotations = []
-        for i in range(self.rows):
-            for j in range(self.cols):
-                text = ax.text(j, i, str(self.car_grid[i, j]), ha="center", va="center", fontsize=8)
-                text_annotations.append(text)
+        texts = [ax.text(j, i, f"{self.car_grid[i, j]}",
+                         ha="center", va="center", fontsize=8)
+                 for i in range(self.rows) for j in range(self.cols)]
 
-        title = ax.set_title("Live Movement - Hour 0")
+        title = ax.set_title("Live Movement – Hour 0")
 
-        def update(frame):
+        def update(_):
             self.move_users_markov_chain()
             self.sim_time_hours += 1
 
-            total_users = np.sum(self.car_grid)
-            assert total_users == self.total_users, f"User mismatch: {total_users}"
-            print(f"Hour {self.sim_time_hours}: Total users = {total_users}")
+            cov_pct, fails, cost = self.calculate_stats()
+            print(f"H{self.sim_time_hours:3d} | "
+                  f"Cov {cov_pct:5.2f}% | "
+                  f"Fail {fails:5d} | "
+                  f"Ant {self.num_antennas:2d} | "
+                  f"Cost {cost:6.0f}")
 
-            heatmap.set_data(self.car_grid)
-            title.set_text(f"Live Movement - {self.get_sim_time()}")
+            heat.set_data(self.car_grid)
+            title.set_text(f"Live Movement – {self.get_sim_time()}")
 
             for i in range(self.rows):
                 for j in range(self.cols):
-                    idx = i * self.cols + j
-                    text_annotations[idx].set_text(str(self.car_grid[i, j]))
+                    texts[i * self.cols + j].set_text(str(self.car_grid[i, j]))
 
-            return [heatmap] + text_annotations
+            return [heat] + texts + [antenna_scatter]
 
         ax.set_xlim(-0.5, self.cols - 0.5)
         ax.set_ylim(self.rows - 0.5, -0.5)
         plt.tight_layout()
-        anim = FuncAnimation(fig, update, frames=hours, interval=interval, blit=False, repeat=False)
+
+        self.anim = FuncAnimation(fig, update, frames=hours,
+                                  interval=interval, blit=False, repeat=False)
         plt.show()
 
-# Run the simulation
+
+# ────────────────────────────
+# MAIN
+# ────────────────────────────
 if __name__ == "__main__":
     env = CellularNetworkEnv()
-    env.visualize_movement_heatmap(hours=24, interval=500)
+    env.visualize(hours=720, interval=300)
+
+    

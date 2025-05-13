@@ -13,7 +13,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 class CellularNetworkEnv(gym.Env):
     """ Gym environment for optimizing antenna placement and handling failures. """
 
-    def __init__(self, rows=6, cols=6, total_users=5000, antenna_capacity=300, time_step=60):
+    def __init__(self, rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60):
         super(CellularNetworkEnv, self).__init__()
         self.time_step = time_step  # real-time duration per step (in minutes)
         self.sim_time_hours = 0
