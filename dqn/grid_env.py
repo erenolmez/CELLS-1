@@ -13,7 +13,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 class CellularNetworkEnv(gym.Env):
     """ Gym environment for optimizing antenna placement and handling failures. """
 
-    def __init__(self, rows=6, cols=6, total_users=5000, antenna_capacity=300, time_step=60):
+    def __init__(self, rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60):
         super(CellularNetworkEnv, self).__init__()
         self.time_step = time_step  # real-time duration per step (in minutes)
         self.sim_time_hours = 0
@@ -36,9 +36,16 @@ class CellularNetworkEnv(gym.Env):
             spaces.Discrete(self.cols),
             spaces.Discrete(2)  # 0 = add, 1 = remove
         ))
+
+
         self.antenna_capacity = antenna_capacity
-        self.num_antennas = self.total_users // self.antenna_capacity
-        self.max_antennas = self.total_users // self.antenna_capacity
+        min_antenna_by_capacity = self.total_users / self.antenna_capacity
+        min_antenna_by_coverage = self.num_cells / ((2 * self.coverage_radius + 1) ** 2)
+        self.num_antennas = int(min_antenna_by_capacity) 
+        self.max_antennas = int(np.ceil(max(min_antenna_by_capacity, min_antenna_by_coverage) * 1.3))
+
+        # self.num_antennas = self.total_users // self.antenna_capacity
+        # self.max_antennas = self.total_users // self.antenna_capacity
         self.place_antennas()
         
         # Place users randomly
@@ -120,46 +127,61 @@ class CellularNetworkEnv(gym.Env):
         # flat_grid = np.random.multinomial(total_users, [1/(self.rows*self.cols)]*(self.rows*self.cols))
         flat_grid = np.random.multinomial(self.total_users, [1 / self.num_cells] * self.num_cells)
         self.car_grid = np.array(flat_grid).reshape((self.rows, self.cols))
-        # print(self.car_grid)
-        
+        print(self.car_grid)
+
     def check_coverage(self):
-        covered_grid = np.zeros((self.rows, self.cols), dtype=int)  # now stores 0–100%
+        """
+        Returns covered_grid (0‑100 %), failures, redirects.
+        Redirects count only when a user is forced to skip one or more
+        *saturated* antennas (capacity = 0) before finding free capacity.
+        """
+        covered_grid = np.zeros((self.rows, self.cols), dtype=int)
         failures = 0
         redirects = 0
         antenna_load = np.zeros((self.rows, self.cols), dtype=int)
 
+        # Pre‑compute neighbour list ordered by Manhattan distance (local first)
+        offsets = [(0,0), (-1,0), (1,0), (0,-1), (0,1),
+                (-1,-1), (-1,1), (1,-1), (1,1)]
+
         for r in range(self.rows):
             for c in range(self.cols):
-                users_in_cell = self.car_grid[r, c]
+                users_in_cell   = self.car_grid[r, c]
                 remaining_users = users_in_cell
-                users_served = 0
+                users_served    = 0
+                saturated_seen  = False          # ← flag for redirect counting
 
-                for dr in range(-self.coverage_radius, self.coverage_radius + 1):
-                    for dc in range(-self.coverage_radius, self.coverage_radius + 1):
-                        nr, nc = r + dr, c + dc
-                        if 0 <= nr < self.rows and 0 <= nc < self.cols:
-                            max_capacity = self.antenna_grid[nr, nc] * self.antenna_capacity
-                            free_capacity = max(0, max_capacity - antenna_load[nr, nc])
+                for dr, dc in offsets:
+                    nr, nc = r + dr, c + dc
+                    if not (0 <= nr < self.rows and 0 <= nc < self.cols):
+                        continue
 
-                            if free_capacity > 0 and remaining_users > 0:
-                                served = min(free_capacity, remaining_users)
-                                antenna_load[nr, nc] += served
-                                remaining_users -= served
-                                users_served += served
+                    # capacity & load
+                    cap_here   = self.antenna_grid[nr, nc] * self.antenna_capacity
+                    free_here  = max(0, cap_here - antenna_load[nr, nc])
 
-                                if (nr != r or nc != c):
-                                    redirects += served
+                    if free_here == 0:
+                        # antenna present and full ⇒ mark that we skipped a saturated one
+                        if cap_here > 0:
+                            saturated_seen = True
+                        continue
 
-                        if remaining_users == 0:
-                            break
+                    if remaining_users == 0:
+                        break
+
+                    served = min(free_here, remaining_users)
+                    antenna_load[nr, nc] += served
+                    remaining_users      -= served
+                    users_served         += served
+
+                    # redirect counted **only** if some saturated antenna was skipped
+                    if saturated_seen:
+                        redirects += served
 
                 failures += remaining_users
 
                 if users_in_cell > 0:
-                    percent_covered = int((users_served / users_in_cell) * 100)
-                    covered_grid[r, c] = percent_covered
-                else:
-                    covered_grid[r, c] = 0
+                    covered_grid[r, c] = int(100 * users_served / users_in_cell)
 
         return covered_grid, failures, redirects
 
@@ -168,7 +190,9 @@ class CellularNetworkEnv(gym.Env):
         Markov movement using *one* multinomial draw per cell:
             category 0  – stay         (prob = 1 − p_move)
             categories 1…k – neighbours (prob = p_move / k each)
+        For edge/corner cells, invalid directions contribute to stay probability.
         """
+
         p_move = self.compute_dynamic_p_move()
         new_car_grid = np.zeros((self.rows, self.cols), dtype=int)
 
@@ -180,21 +204,21 @@ class CellularNetworkEnv(gym.Env):
 
                 neighbors = self.neighbor_map[(r, c)]
                 k = len(neighbors)
-                # Single multinomial draw — R‑style
-                move_counts = np.random.multinomial(
-                    users,
-                    [1.0 - p_move] + [p_move / k] * k 
-                )
+                missing = 8 - k
+                stay_prob = 1.0 - p_move + (missing * (p_move / 8))
+                move_probs = [stay_prob] + [p_move / 8] * k
 
-                # 1) stayers
+                move_counts = np.random.multinomial(users, move_probs)
+
+                 # 1) stayers
                 new_car_grid[r, c] += move_counts[0]
 
                 # 2) movers to each neighbour
-                for idx, cnt in enumerate(move_counts[1:]):
+                for idx, count in enumerate(move_counts[1:]):
                     nr, nc = neighbors[idx]
-                    new_car_grid[nr, nc] += cnt
+                    new_car_grid[nr, nc] += count
 
-        self.car_grid = new_car_grid
+        self.car_grid = new_car_grid   
 
     def update_after_user_movement(self):
             """ Update coverage and failures after user movement. """
@@ -224,22 +248,20 @@ class CellularNetworkEnv(gym.Env):
         return reward
 
     def step(self, action):
-        if action is not None:
-            r, c, op = action
+        r, c, op = action
 
-            if op == 0:
-                if np.sum(self.antenna_grid) < self.max_antennas:
-                    self.antenna_grid[r, c] += 1
-            elif op == 1:
-                if self.antenna_grid[r, c] > 0:
-                    self.antenna_grid[r, c] -= 1
+        if op == 0:
+            if np.sum(self.antenna_grid) < self.max_antennas:
+                self.antenna_grid[r, c] += 1
+        elif op == 1:
+            if self.antenna_grid[r, c] > 0:
+                self.antenna_grid[r, c] -= 1
 
         # Simulate user movement
         self.move_users_markov_chain()
 
         # Evaluate coverage
         covered_grid, failures, redirects = self.check_coverage()
-        self.covered_grid = covered_grid       
         reward = self.calculate_reward(failures, redirects)
 
         # ⏱️ 
@@ -355,13 +377,44 @@ class CellularNetworkEnv(gym.Env):
         anim = FuncAnimation(fig, update, frames=steps, interval=interval, blit=False, repeat=False)
         plt.show()
 
+    def animate_user_histogram(self, steps=240, interval=200):
+        """
+        Animate a histogram showing the number of users per cell over time.
+        Each bar represents one cell in the grid (flattened index 0 to N-1).
+        """
+        fig, ax = plt.subplots(figsize=(10, 5))
+
+        # Precompute and freeze user states over time
+        user_history = []
+        for _ in range(steps):
+            self.move_users_markov_chain()
+            user_history.append(self.car_grid.flatten().copy())  # Freeze state snapshot
+
+        user_data = np.array(user_history)
+        num_cells = self.rows * self.cols
+
+        bars = ax.bar(np.arange(num_cells), user_data[0], color='skyblue')
+        title = ax.set_title("User Distribution Histogram - Step 0")
+        ax.set_ylim(0, np.max(user_data) + 50)
+        ax.set_xlabel("Grid Cell Index (0 to {})".format(num_cells - 1))
+        ax.set_ylabel("Users per Cell")
+
+        def update(frame):
+            for bar, height in zip(bars, user_data[frame]):
+                bar.set_height(height)
+            title.set_text(f"User Distribution Histogram - Step {frame}")
+            return bars
+
+        anim = FuncAnimation(fig, update, frames=steps, interval=interval, blit=False, repeat=False)
+        plt.show()
+
 #%%
 # Test the environment
-# env = CellularNetworkEnv()
+env = CellularNetworkEnv()
 # env.render()
 # env.render_heatmaps()
 # print("Total users before:", np.sum(env.car_grid))
-
+# env.print_neighbor_grid()
  #%%
 
 # Move users using Markov Chain
@@ -369,8 +422,6 @@ class CellularNetworkEnv(gym.Env):
 # print("\nAfter User Movement (Markov Chain):")
 # env.render()
 # env.render_heatmaps()
-# env.animate_car_grid(steps=24, interval=500)
+env.animate_car_grid(steps=240, interval=500)
 # print("Total users after: ", np.sum(env.car_grid))
-
- #%%
-print("Tutorial complete!")
+# env.animate_user_histogram(steps=240, interval=200)
