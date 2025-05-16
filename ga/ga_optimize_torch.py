@@ -131,7 +131,7 @@ def evaluate_batch(bits):
             cum_red.cpu().tolist(), ant_cnt.cpu().tolist())
 
 # ─────────────────────────────────────────
-# 6. GA main loop (identical logic)
+# 6. GA main loop
 # ─────────────────────────────────────────
 random.seed(42); np.random.seed(42)
 pop = [random_layout() for _ in range(POP_SIZE)]
@@ -147,10 +147,17 @@ for gen in range(GENERATIONS):
         best_bits  = pop[idx][:]
         best_tuple = (fails[idx], reds[idx], ants[idx])
 
-    eta = (time.time() - start) / (gen + 1) * (GENERATIONS - gen - 1)
+    # === NEW: metrics ===
+    avg_fail_per_step = best_tuple[0] / EP_STEPS             ### NEW ###
+    avg_coverage = 100 * (1 - avg_fail_per_step / TOTAL_USERS)  ### NEW ###
+
+    elapsed = time.time() - start
+    eta = elapsed / (gen + 1) * (GENERATIONS - gen - 1)
     print(f"Gen {gen:03d} | best={best_score:7.1f} "
           f"(F={best_tuple[0]} R={best_tuple[1]} A={best_tuple[2]}) "
-          f"| ETA {eta/60:.1f}m")
+          f"| fail/step={avg_fail_per_step:.1f} "
+          f"coverage={avg_coverage:.2f}% "
+          f"| ETA {eta/60:.1f}m")                                ### NEW ###
 
     ranked = [x for _, x in sorted(zip(scores, pop))]
     survivors = ranked[:POP_SIZE // 4]
