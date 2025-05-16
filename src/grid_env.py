@@ -13,7 +13,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 class CellularNetworkEnv(gym.Env):
     """ Gym environment for optimizing antenna placement and handling failures. """
 
-    def __init__(self, rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60):
+    def __init__(self, rows=6, cols=6, total_users=5000, antenna_capacity=300, time_step=60):
         super(CellularNetworkEnv, self).__init__()
         self.time_step = time_step  # real-time duration per step (in minutes)
         self.sim_time_hours = 0
@@ -272,6 +272,35 @@ class CellularNetworkEnv(gym.Env):
         obs = np.concatenate((self.car_grid.flatten(), self.antenna_grid.flatten()))
         return obs, reward, done, {}
 
+    def evaluate_placement(self, steps: int = 240):
+        """
+        Run the simulation for N steps and print:
+        • Total + average failures
+        • Total + average redirects
+        • Userwise coverage rate (% of all users served)
+        """
+        total_failures = 0
+        total_redirects = 0
+
+        for _ in range(steps):
+            self.move_users_markov_chain()
+            _, failures, redirects = self.check_coverage()
+            total_failures += failures
+            total_redirects += redirects
+
+        avg_fail = total_failures / steps
+        avg_red  = total_redirects / steps
+
+        # total users over all steps = steps * constant self.total_users
+        userwise_coverage = 100 * (1 - total_failures / (self.total_users * steps))
+
+        print(f"\n📊 Evaluation over {steps} steps:")
+        print(f"  Total Failures         : {total_failures}")
+        print(f"  Total Redirects        : {total_redirects}")
+        print(f"  Avg Failures per step  : {avg_fail:.2f}")
+        print(f"  Avg Redirects per step : {avg_red:.2f}")
+        print(f"  Userwise Coverage Rate : {userwise_coverage:.2f}%")
+
     def render(self):
         """ Display the grid state with separate visuals for cars, antennas, and coverage. """
         self.covered_grid, failures, redirects = self.check_coverage()
@@ -422,6 +451,40 @@ env = CellularNetworkEnv()
 # print("\nAfter User Movement (Markov Chain):")
 # env.render()
 # env.render_heatmaps()
-env.animate_car_grid(steps=240, interval=500)
+# env.animate_car_grid(steps=240, interval=500)
 # print("Total users after: ", np.sum(env.car_grid))
-# env.animate_user_histogram(steps=240, interval=200)
+# env.animate_user_histogram(steps=240, interval=200)env = CellularNetworkEnv()
+# %% Evaluate a fixed antenna layout over 240 steps
+env = CellularNetworkEnv()
+env.antenna_grid = np.array([
+    [1, 1, 0, 0, 0, 1],
+    [0, 0, 2, 1, 0, 0],
+    [0, 0, 0, 2, 2, 0],
+    [1, 0, 0, 0, 2, 0],
+    [0, 2, 1, 0, 0, 0],
+    [0, 0, 1, 1, 1, 0]
+])
+env.place_users()
+env.evaluate_placement(steps=8760)
+
+env.antenna_grid = np.array([
+    [0, 1, 0, 0, 1, 0],
+    [0, 0, 1, 1, 1, 0],
+    [0, 1, 1, 0, 0, 0],
+    [0, 2, 0, 0, 1, 0],
+    [0, 0, 2, 1, 1, 1],
+    [1, 0, 0, 0, 0, 1]
+])
+env.place_users()                  # initialize user distribution
+env.evaluate_placement(steps=8760) # run 1 year (8760 hours)
+
+env.antenna_grid = np.array([
+    [0, 1, 0, 1, 1, 1],
+    [0, 1, 0, 1, 1, 0],
+    [0, 1, 1, 0, 1, 0],
+    [1, 1, 0, 1, 0, 0],
+    [0, 0, 1, 0, 0, 0],
+    [0, 0, 1, 0, 0, 1]
+], dtype=int)
+env.place_users()                  # initialize user distribution
+env.evaluate_placement(steps=8760) # run 1 year (8760 hours)

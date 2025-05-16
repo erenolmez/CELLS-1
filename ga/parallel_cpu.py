@@ -71,24 +71,41 @@ class CellularNetworkEnvTorch:
     def coverage_stats(self) -> Tuple[int, int]:
         failures = 0
         redirects = 0
+        antenna_load = th.zeros((self.rows, self.cols), dtype=th.int32, device=device)
+        offsets = [(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
+
         for r in range(self.rows):
             for c in range(self.cols):
                 users = int(self.car_grid[r, c].item())
                 if users == 0:
                     continue
+
                 remaining = users
-                for dr in (-1, 0, 1):
-                    for dc in (-1, 0, 1):
-                        nr, nc = r + dr, c + dc
-                        if 0 <= nr < self.rows and 0 <= nc < self.cols:
-                            cap = int(self.antenna_grid[nr, nc]) * self.antenna_capacity
-                            if cap and remaining:
-                                served = min(cap, remaining)
-                                remaining -= served
-                                if (nr, nc) != (r, c):
-                                    redirects += served
-                        if remaining == 0:
-                            break
+                saturated_seen = False
+
+                for dr, dc in offsets:
+                    nr, nc = r + dr, c + dc
+                    if not (0 <= nr < self.rows and 0 <= nc < self.cols):
+                        continue
+
+                    cap = int(self.antenna_grid[nr, nc].item()) * self.antenna_capacity
+                    used = int(antenna_load[nr, nc].item())
+                    free = max(0, cap - used)
+
+                    if free == 0 and cap > 0:
+                        saturated_seen = True
+                        continue
+
+                    if remaining == 0:
+                        break
+
+                    served = min(free, remaining)
+                    antenna_load[nr, nc] += served
+                    remaining -= served
+
+                    if saturated_seen:
+                        redirects += served
+
                 failures += remaining
         return failures, redirects
 
@@ -96,6 +113,7 @@ class CellularNetworkEnvTorch:
         self.move_users()
         self.sim_time_h += 1
 
+# ──── GA Setup ────
 ROWS, COLS = 6, 6
 GRID_SIZE  = ROWS * COLS
 POP_SIZE   = 60
@@ -105,26 +123,17 @@ CX_PROB    = 0.7
 MUT_PROB   = 0.05
 EP_STEPS   = 240
 W_FAIL, W_RED, W_ANT = 3.0, 0.1, 0.5
-MAX_ANTENNAS = CellularNetworkEnvTorch().max_antennas
+MAX_PER_CELL = 5
 
 def bits_to_tensor(bits: List[int]) -> th.Tensor:
     return th.tensor(bits, dtype=th.int8, device=device).reshape((ROWS, COLS))
 
 def random_layout() -> List[int]:
-    bits = [0] * GRID_SIZE
-    for i in random.sample(range(GRID_SIZE), MAX_ANTENNAS):
-        bits[i] = 1
-    return bits
+    return [random.randint(0, MAX_PER_CELL) for _ in range(GRID_SIZE)]
 
 def repair(bits: List[int]):
-    ones = [i for i, b in enumerate(bits) if b]
-    zeros = [i for i, b in enumerate(bits) if not b]
-    if len(ones) > MAX_ANTENNAS:
-        for i in random.sample(ones, len(ones) - MAX_ANTENNAS):
-            bits[i] = 0
-    elif len(ones) < MAX_ANTENNAS:
-        for i in random.sample(zeros, MAX_ANTENNAS - len(ones)):
-            bits[i] = 1
+    for i in range(len(bits)):
+        bits[i] = max(0, min(MAX_PER_CELL, bits[i]))
 
 def crossover(p1, p2):
     if random.random() > CX_PROB:
@@ -138,21 +147,25 @@ def crossover(p1, p2):
 def mutate(bits):
     for i in range(GRID_SIZE):
         if random.random() < MUT_PROB:
-            bits[i] ^= 1
+            delta = random.choice([-1, 1])
+            bits[i] = max(0, min(MAX_PER_CELL, bits[i] + delta))
     repair(bits)
 
-def fitness(bits: List[int]) -> Tuple[float, int, int, int]:
+def fitness(bits: List[int]) -> Tuple[float, int, int, int, float, float]:
     env = CellularNetworkEnvTorch()
     env.antenna_grid = bits_to_tensor(bits)
+    total_failures = 0
+    total_redirects = 0
     for _ in range(EP_STEPS):
         env.step()
-    fails, reds = env.coverage_stats()
+        f, r = env.coverage_stats()
+        total_failures += f
+        total_redirects += r
     ant_cost = int(th.sum(env.antenna_grid).item())
-    score = W_FAIL * fails + W_RED * reds + W_ANT * ant_cost
-    return score, fails, reds, ant_cost
+    score = W_FAIL * total_failures + W_RED * total_redirects + W_ANT * ant_cost
+    return score, total_failures, total_redirects, ant_cost, total_failures / EP_STEPS, total_redirects / EP_STEPS
 
 if __name__ == "__main__":
-    # Place the entire GA loop inside this block
     pop = [random_layout() for _ in range(POP_SIZE)]
     best_bits, best_score  = None, float('inf')
     best_triplet = None
@@ -162,10 +175,10 @@ if __name__ == "__main__":
         with ProcessPoolExecutor(max_workers=NUM_WORKERS) as pool:
             scored = list(pool.map(fitness, pop))
 
-        for ind, (score, f, r, a) in zip(pop, scored):
+        for ind, (score, f, r, a, avgf, avgr) in zip(pop, scored):
             if score < best_score:
                 best_bits, best_score = ind[:], score
-                best_triplet = (f, r, a)
+                best_triplet = (f, r, a, avgf, avgr)
 
         gen_time = time.time() - start
         avg_per_gen = gen_time / (g + 1)
@@ -174,6 +187,7 @@ if __name__ == "__main__":
 
         print(f"Gen {g:03d}  best={best_score:7.2f}  "
               f"fails={best_triplet[0]}  red={best_triplet[1]}  ant={best_triplet[2]}  "
+              f"avg_fail={best_triplet[3]:.1f}  avg_red={best_triplet[4]:.1f}  "
               f"[Elapsed: {elapsed}, ETA: {eta}]")
 
         new_pop = []
@@ -194,6 +208,7 @@ if __name__ == "__main__":
     print(f"Failures     : {best_triplet[0]}")
     print(f"Redirects    : {best_triplet[1]}")
     print(f"Antenna count: {best_triplet[2]}")
-    print("Best layout grid (1 = antenna):")
+    print(f"Avg Failures : {best_triplet[3]:.1f}")
+    print(f"Avg Redirects: {best_triplet[4]:.1f}")
+    print("Best layout grid (num antennas per cell):")
     print(np.array(bits_to_tensor(best_bits).cpu()))
-
