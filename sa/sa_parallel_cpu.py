@@ -9,15 +9,15 @@ from datetime import timedelta
 # ─────────────────────────────────────────────
 # 1.  Hyper‑parameters
 # ─────────────────────────────────────────────
-ROWS, COLS     = 6, 6
+ROWS, COLS     = 20, 20
 GRID_SIZE      = ROWS * COLS
 MAX_PER_CELL   = 5
-EP_STEPS       = 240
+EP_STEPS       = 720
 T_INIT         = 10.0
 T_MIN          = 0.05
 ALPHA          = 0.95
 ITER_PER_TEMP  = 100
-W_FAIL, W_RED, W_ANT = 2.0, 0.4, 1.2
+W_FAIL, W_RED, W_ANT = 2.0, 0.1, 0.5
 SEED = 42
 random.seed(SEED); np.random.seed(SEED)
 NUM_WORKERS = os.cpu_count() or 4
@@ -31,7 +31,7 @@ class CellularNetworkEnvTorch:
     rows, cols = ROWS, COLS
     num_cells  = rows * cols
 
-    def __init__(self, total_users: int = 5000, antenna_capacity: int = 300, time_step: int = 60):
+    def __init__(self, total_users: int = 50000, antenna_capacity: int = 300, time_step: int = 60):
         self.total_users     = total_users
         self.antenna_capacity = antenna_capacity
         self.time_step       = time_step

@@ -14,10 +14,10 @@ print(f"Running on: CPU ({NUM_WORKERS} workers)")
 
 # ──── Environment Definition ────
 class CellularNetworkEnvTorch:
-    rows, cols = 6, 6
+    rows, cols = 20, 20
     num_cells  = rows * cols
 
-    def __init__(self, total_users: int = 5000, antenna_capacity: int = 300, time_step: int = 60):
+    def __init__(self, total_users: int = 50000, antenna_capacity: int = 300, time_step: int = 60):
         self.total_users     = total_users
         self.antenna_capacity = antenna_capacity
         self.time_step       = time_step
@@ -114,7 +114,7 @@ class CellularNetworkEnvTorch:
         self.sim_time_h += 1
 
 # ──── GA Setup ────
-ROWS, COLS = 6, 6
+ROWS, COLS = 20, 20
 GRID_SIZE  = ROWS * COLS
 POP_SIZE   = 60
 GENERATIONS = 120
@@ -122,8 +122,8 @@ TOUR_K     = 3
 CX_PROB    = 0.7
 MUT_PROB   = 0.05
 EP_STEPS   = 240
-W_FAIL, W_RED, W_ANT = 3.0, 0.1, 0.5
-MAX_PER_CELL = 5
+W_FAIL, W_RED, W_ANT = 2.0, 0.1, 0.5
+MAX_PER_CELL = 2
 
 def bits_to_tensor(bits: List[int]) -> th.Tensor:
     return th.tensor(bits, dtype=th.int8, device=device).reshape((ROWS, COLS))

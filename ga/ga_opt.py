@@ -1,139 +1,140 @@
-"""
-ga_optimize.py
-==============
+import torch
+import time
+import random
+import statistics
+from typing import List, Tuple
 
-Static antenna‑placement optimiser using a simple Genetic Algorithm
-on top of CellularNetworkEnv.  One chromosome = 36‑bit vector; exactly
-`max_antennas` bits must be 1.  Fitness = failures after simulating
-10 days (240 env steps).
+# Vectorized environment supporting batch simulation
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-Usage:
-    python ga_optimize.py
-"""
+class VectorizedCellularNetworkEnv:
+    def __init__(self, batch_size, rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60):
+        self.batch_size = batch_size
+        self.rows = rows
+        self.cols = cols
+        self.total_users = total_users
+        self.antenna_capacity = antenna_capacity
+        self.time_step = time_step
 
-from __future__ import annotations
-import random, itertools, time
-from typing import List
+        self.antenna_grid = torch.zeros((batch_size, rows, cols), dtype=torch.int32, device=device)
+        self.user_pos = None
 
-import numpy as np
-from grid_env import CellularNetworkEnv
+    def set_antenna_grids(self, antenna_grids: torch.Tensor):
+        self.antenna_grid = antenna_grids.to(device=device)
 
+    def place_users(self):
+        rows = torch.randint(0, self.rows, (self.batch_size, self.total_users), device=device)
+        cols = torch.randint(0, self.cols, (self.batch_size, self.total_users), device=device)
+        self.user_pos = torch.stack((rows, cols), dim=2)
 
-# ─────────────────────────────────────────────
-# 1.  GA hyper‑parameters
-# ─────────────────────────────────────────────
-POP_SIZE        = 60
-GENERATIONS     = 120
-TOURNAMENT_K    = 3
-CX_PROB         = 0.7     # crossover probability
-MUT_PROB        = 0.05    # per‑bit mutation probability
+    def move_users_markov_chain(self):
+        delta = torch.tensor([[0,0], [-1,0], [1,0], [0,-1], [0,1]], device=device)
+        actions = torch.randint(0, 5, (self.batch_size, self.total_users), device=device)
+        move = delta[actions]
+        new_pos = self.user_pos + move
+        new_pos[..., 0].clamp_(0, self.rows - 1)
+        new_pos[..., 1].clamp_(0, self.cols - 1)
+        self.user_pos = new_pos
 
-EP_STEPS        = 240     # 10 days  × 24 h
-SEED            = 42
-random.seed(SEED); np.random.seed(SEED)
+    def check_coverage(self):
+        B, U, _ = self.user_pos.shape
+        coverage = torch.zeros((B, self.rows, self.cols), dtype=torch.int32, device=device)
 
+        for b in range(B):
+            row_idx = self.user_pos[b, :, 0]
+            col_idx = self.user_pos[b, :, 1]
+            coverage[b].index_put_((row_idx, col_idx), torch.ones(U, dtype=torch.int32, device=device), accumulate=True)
 
-# ─────────────────────────────────────────────
-# 2.  Environment constants
-# ─────────────────────────────────────────────
-env_proto = CellularNetworkEnv()
-GRID_SIZE       = env_proto.rows * env_proto.cols        # 36
-MAX_ANTENNAS    = env_proto.max_antennas                 # 16
+        capacity = self.antenna_grid * self.antenna_capacity
+        served = torch.minimum(coverage, capacity)
+        fails = self.total_users - served.sum(dim=(1,2))
+        redirects = (coverage > capacity).sum(dim=(1,2))
+        return fails, redirects
 
+# GA Parameters
+POP_SIZE = 60
+GENERATIONS = 120
+TOURNAMENT_K = 3
+CX_PROB = 0.7
+MUT_PROB = 0.05
+MAX_PER_CELL = 2
+EP_STEPS = 240
+SEED = 42
 
-# ─────────────────────────────────────────────
-# 3.  Helper functions
-# ─────────────────────────────────────────────
-def random_chromosome() -> List[int]:
-    """Binary vector with exactly MAX_ANTENNAS ones."""
-    bits = [0] * GRID_SIZE
-    ones = random.sample(range(GRID_SIZE), MAX_ANTENNAS)
-    for idx in ones:
-        bits[idx] = 1
-    return bits
+torch.manual_seed(SEED)
+random.seed(SEED)
 
-def repair(chromo: List[int]) -> None:
-    """Ensure chromosome has exactly MAX_ANTENNAS ones (in‑place)."""
-    ones = [i for i,b in enumerate(chromo) if b]
-    zeros = [i for i,b in enumerate(chromo) if not b]
-    if len(ones) > MAX_ANTENNAS:          # too many 1s → flip extras to 0
-        flip = random.sample(ones, len(ones) - MAX_ANTENNAS)
-        for i in flip: chromo[i] = 0
-    elif len(ones) < MAX_ANTENNAS:        # too few 1s → flip some 0s to 1
-        flip = random.sample(zeros, MAX_ANTENNAS - len(ones))
-        for i in flip: chromo[i] = 1
+LAMBDA_FAILURE = 3.00
+LAMBDA_REDIRECT = 0.10
+LAMBDA_ANTENNA = 1.00
 
-def crossover(p1: List[int], p2: List[int]) -> tuple[List[int], List[int]]:
-    if random.random() > CX_PROB:
-        return p1[:], p2[:]
-    point = random.randint(1, GRID_SIZE-2)
-    c1 = p1[:point] + p2[point:]
-    c2 = p2[:point] + p1[point:]
-    repair(c1); repair(c2)
-    return c1, c2
+GRID_ROWS, GRID_COLS = 20, 20
+GRID_SIZE = GRID_ROWS * GRID_COLS
 
-def mutate(chromo: List[int]) -> None:
-    for i in range(GRID_SIZE):
-        if random.random() < MUT_PROB:
-            chromo[i] ^= 1   # flip bit
-    repair(chromo)
+# GA Functions
+def random_population(pop_size: int) -> torch.Tensor:
+    return torch.randint(0, MAX_PER_CELL + 1, (pop_size, GRID_SIZE), device=device)
 
-def layout_to_grid(bits: List[int]) -> np.ndarray:
-    """Convert 36‑bit vector to 6 × 6 antenna_grid (int)."""
-    grid = np.array(bits, dtype=int).reshape((env_proto.rows, env_proto.cols))
-    return grid
+def crossover_batch(p1: torch.Tensor, p2: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    mask = torch.rand(p1.shape, device=device) < 0.5
+    return torch.where(mask, p1, p2), torch.where(mask, p2, p1)
 
-def fitness(bits: List[int]) -> tuple[int,int]:
-    """Return (failures, redirects) after a 10‑day simulation."""
-    env = CellularNetworkEnv()
-    env.antenna_grid = layout_to_grid(bits)
-    # run simulation
+def mutate_batch(pop: torch.Tensor) -> torch.Tensor:
+    mutation_mask = torch.rand(pop.shape, device=device) < MUT_PROB
+    random_genes = torch.randint(0, MAX_PER_CELL + 1, pop.shape, device=device)
+    return torch.where(mutation_mask, random_genes, pop)
+
+def chromo_to_grid(ch: torch.Tensor) -> torch.Tensor:
+    return ch.view(-1, GRID_ROWS, GRID_COLS)
+
+def eval_layout_batch(pop: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    grids = chromo_to_grid(pop)
+    env = VectorizedCellularNetworkEnv(batch_size=grids.shape[0], rows=GRID_ROWS, cols=GRID_COLS)
+    env.set_antenna_grids(grids)
+    env.place_users()
     for _ in range(EP_STEPS):
-        env.step(None)          # None = no‑op (antenna layout fixed)
-    _, fails, reds = env.check_coverage()
-    return fails, reds          # tuple so GA can tiebreak
+        env.move_users_markov_chain()
+    fails, reds = env.check_coverage()
+    ant_cnt = grids.sum(dim=(1,2))
+    fitness = LAMBDA_FAILURE * fails + LAMBDA_REDIRECT * reds + LAMBDA_ANTENNA * ant_cnt
+    return fitness, fails, reds, ant_cnt
 
-# ─────────────────────────────────────────────
-# 4.  GA main loop
-# ─────────────────────────────────────────────
-pop = [random_chromosome() for _ in range(POP_SIZE)]
-best_bits   = None
-best_score  = (float('inf'), float('inf'))
+def tournament_selection(pop: torch.Tensor, fitness: torch.Tensor) -> torch.Tensor:
+    indices = torch.randint(0, pop.size(0), (TOURNAMENT_K,), device=device)
+    selected = pop[indices]
+    selected_fitness = fitness[indices]
+    return selected[torch.argmin(selected_fitness)]
 
+# GA Main Loop
+pop = random_population(POP_SIZE)
+best_ch, best_fit, best_tuple = None, float('inf'), None
 start = time.time()
+
 for gen in range(GENERATIONS):
+    fitness, fails, reds, ant_cnts = eval_layout_batch(pop)
+    gen_best_idx = torch.argmin(fitness).item()
+    if fitness[gen_best_idx] < best_fit:
+        best_fit = fitness[gen_best_idx].item()
+        best_ch = pop[gen_best_idx].clone()
+        best_tuple = (best_fit, fails[gen_best_idx].item(), reds[gen_best_idx].item(), ant_cnts[gen_best_idx].item())
 
-    # ---- evaluate population
-    scores = [fitness(ind) for ind in pop]
-    for bits, score in zip(pop, scores):
-        if score < best_score:
-            best_bits, best_score = bits[:], score
+    print(f"Gen {gen:03d} | bestF={fails[gen_best_idx]:4d} bestR={reds[gen_best_idx]:4d} A={ant_cnts[gen_best_idx]:3d} | "
+        f"meanF={fails.float().mean():6.1f} meanR={reds.float().mean():6.1f} Aµ={ant_cnts.float().mean():4.1f}")
 
-    print(f"Gen {gen:03d}: best failures={best_score[0]:5d} "
-          f"redirects={best_score[1]:5d}")
-
-    # ---- selection (tournament)
     new_pop = []
     while len(new_pop) < POP_SIZE:
-        contenders = random.sample(list(zip(pop, scores)), TOURNAMENT_K)
-        parent1 = min(contenders, key=lambda t: t[1])[0]
-        contenders = random.sample(list(zip(pop, scores)), TOURNAMENT_K)
-        parent2 = min(contenders, key=lambda t: t[1])[0]
+        p1 = tournament_selection(pop, fitness)
+        p2 = tournament_selection(pop, fitness)
+        c1, c2 = crossover_batch(p1.unsqueeze(0), p2.unsqueeze(0))
+        new_pop.extend([mutate_batch(c1)[0], mutate_batch(c2)[0]])
+    pop = torch.stack(new_pop[:POP_SIZE])
 
-        # ---- crossover & mutation
-        child1, child2 = crossover(parent1, parent2)
-        mutate(child1); mutate(child2)
-        new_pop.extend([child1, child2])
-
-    pop = new_pop[:POP_SIZE]
-
-elapsed = time.time() - start
-print("\n=============  GA Complete  =============")
-print(f"Elapsed time: {elapsed/60:.1f} min")
-print(f"Best failures : {best_score[0]}")
-print(f"Best redirects: {best_score[1]}")
-
-# ---- pretty‑print best layout
-best_grid = layout_to_grid(best_bits)
-print("\nBest antenna grid (1 = antenna):")
-print(best_grid)
+# Final Output
+print("\n=========== GA Complete ===========")
+print(f"Elapsed: {(time.time() - start)/60:.1f} min")
+print(f"Best fitness   : {best_tuple[0]:.2f}")
+print(f"Failures       : {best_tuple[1]}")
+print(f"Redirects      : {best_tuple[2]}")
+print(f"Antenna count  : {best_tuple[3]}")
+print("Best layout grid (antenna counts):")
+print(best_ch.view(GRID_ROWS, GRID_COLS).int().cpu().numpy())
