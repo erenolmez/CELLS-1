@@ -8,7 +8,8 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.patches import Circle
 from matplotlib import gridspec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib import colormaps
 # %%
 class CellularNetworkEnv(gym.Env):
     """ Gym environment for optimizing antenna placement and handling failures. """
@@ -127,63 +128,65 @@ class CellularNetworkEnv(gym.Env):
         # flat_grid = np.random.multinomial(total_users, [1/(self.rows*self.cols)]*(self.rows*self.cols))
         flat_grid = np.random.multinomial(self.total_users, [1 / self.num_cells] * self.num_cells)
         self.car_grid = np.array(flat_grid).reshape((self.rows, self.cols))
-        print(self.car_grid)
+        # print(self.car_grid)
+
 
     def check_coverage(self):
-        """
-        Returns covered_grid (0‑100 %), failures, redirects.
-        Redirects count only when a user is forced to skip one or more
-        *saturated* antennas (capacity = 0) before finding free capacity.
-        """
-        covered_grid = np.zeros((self.rows, self.cols), dtype=int)
-        failures = 0
-        redirects = 0
-        antenna_load = np.zeros((self.rows, self.cols), dtype=int)
+            """
+            Returns covered_grid (0‑100 %), failures, redirects.
+            Redirects count only when a user is forced to skip one or more
+            *saturated* antennas (capacity = 0) before finding free capacity.
+            """
+            covered_grid = np.zeros((self.rows, self.cols), dtype=int)
+            failures = 0
+            redirects = 0
+            antenna_load = np.zeros((self.rows, self.cols), dtype=int)
 
-        # Pre‑compute neighbour list ordered by Manhattan distance (local first)
-        offsets = [(0,0), (-1,0), (1,0), (0,-1), (0,1),
-                (-1,-1), (-1,1), (1,-1), (1,1)]
+            # Pre‑compute neighbour list ordered by Manhattan distance (local first)
+            offsets = [(0,0), (-1,0), (1,0), (0,-1), (0,1),
+                    (-1,-1), (-1,1), (1,-1), (1,1)]
 
-        for r in range(self.rows):
-            for c in range(self.cols):
-                users_in_cell   = self.car_grid[r, c]
-                remaining_users = users_in_cell
-                users_served    = 0
-                saturated_seen  = False          # ← flag for redirect counting
+            for r in range(self.rows):
+                for c in range(self.cols):
+                    users_in_cell   = self.car_grid[r, c]
+                    remaining_users = users_in_cell
+                    users_served    = 0
+                    saturated_seen  = False          # ← flag for redirect counting
 
-                for dr, dc in offsets:
-                    nr, nc = r + dr, c + dc
-                    if not (0 <= nr < self.rows and 0 <= nc < self.cols):
-                        continue
+                    for dr, dc in offsets:
+                        nr, nc = r + dr, c + dc
+                        if not (0 <= nr < self.rows and 0 <= nc < self.cols):
+                            continue
 
-                    # capacity & load
-                    cap_here   = self.antenna_grid[nr, nc] * self.antenna_capacity
-                    free_here  = max(0, cap_here - antenna_load[nr, nc])
+                        # capacity & load
+                        cap_here   = self.antenna_grid[nr, nc] * self.antenna_capacity
+                        free_here  = max(0, cap_here - antenna_load[nr, nc])
 
-                    if free_here == 0:
-                        # antenna present and full ⇒ mark that we skipped a saturated one
-                        if cap_here > 0:
-                            saturated_seen = True
-                        continue
+                        if free_here == 0:
+                            # antenna present and full ⇒ mark that we skipped a saturated one
+                            if cap_here > 0:
+                                saturated_seen = True
+                            continue
 
-                    if remaining_users == 0:
-                        break
+                        if remaining_users == 0:
+                            break
 
-                    served = min(free_here, remaining_users)
-                    antenna_load[nr, nc] += served
-                    remaining_users      -= served
-                    users_served         += served
+                        served = min(free_here, remaining_users)
+                        antenna_load[nr, nc] += served
+                        remaining_users      -= served
+                        users_served         += served
 
-                    # redirect counted **only** if some saturated antenna was skipped
-                    if saturated_seen:
-                        redirects += served
+                        # redirect counted **only** if some saturated antenna was skipped
+                        if saturated_seen:
+                            redirects += served
 
-                failures += remaining_users
+                    failures += remaining_users
 
-                if users_in_cell > 0:
-                    covered_grid[r, c] = int(100 * users_served / users_in_cell)
+                    if users_in_cell > 0:
+                        covered_grid[r, c] = int(100 * users_served / users_in_cell)
 
-        return covered_grid, failures, redirects
+            return covered_grid, failures, redirects
+
 
     def move_users_markov_chain(self):
         """
@@ -244,7 +247,7 @@ class CellularNetworkEnv(gym.Env):
         redirect_penalty = redirects / total_users
         antenna_cost = total_antennas / self.max_antennas  # Normalize [0, 1]
 
-        reward = 1.0 - (2.0 * failure_penalty + 0.5 * redirect_penalty + 0.3 * antenna_cost)
+        reward = 1.0 - (2.0 * failure_penalty + 0.1 * redirect_penalty + 1.0 * antenna_cost)
         return reward
 
     def step(self, action):
@@ -278,28 +281,35 @@ class CellularNetworkEnv(gym.Env):
         • Total + average failures
         • Total + average redirects
         • Userwise coverage rate (% of all users served)
+        • Total antenna cost (antennas × steps)
         """
         total_failures = 0
         total_redirects = 0
+        reward_accum = 0.0
+
+        ant_count = int(np.sum(self.antenna_grid)) 
 
         for _ in range(steps):
             self.move_users_markov_chain()
             _, failures, redirects = self.check_coverage()
             total_failures += failures
             total_redirects += redirects
+            reward_accum    += self.calculate_reward(failures, redirects)
 
         avg_fail = total_failures / steps
         avg_red  = total_redirects / steps
-
-        # total users over all steps = steps * constant self.total_users
+        avg_reward = reward_accum  / steps
+        episode_cost = 1.0 - avg_reward
         userwise_coverage = 100 * (1 - total_failures / (self.total_users * steps))
 
         print(f"\n📊 Evaluation over {steps} steps:")
+        print(f"  Antennas deployed      : {ant_count}")
         print(f"  Total Failures         : {total_failures}")
         print(f"  Total Redirects        : {total_redirects}")
         print(f"  Avg Failures per step  : {avg_fail:.2f}")
         print(f"  Avg Redirects per step : {avg_red:.2f}")
         print(f"  Userwise Coverage Rate : {userwise_coverage:.2f}%")
+        print(f"  Episode Cost (1-R)     : {episode_cost:.4f}")
 
     def render(self):
         """ Display the grid state with separate visuals for cars, antennas, and coverage. """
@@ -338,29 +348,20 @@ class CellularNetworkEnv(gym.Env):
         # plot_single_heatmap(self.antenna_grid, title="Antenna Grid (0 or 1)", cmap="viridis")
         # plot_single_heatmap(self.covered_grid, title="Coverage Grid (0 = Uncovered, 1 = Covered)", cmap="Greens")
 
-    def animate_car_grid(self, steps=20, interval=500):
-        """Animates user movement with top-right coverage markers and aligned colorbar."""
-
+    def animate_car_grid(self, steps=20, interval=500, save_path="user_movement.gif", show=True, save=True):
         fig, ax = plt.subplots(figsize=(6, 6))
-
-        # Attach a perfectly sized colorbar next to the grid
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.1)
 
         heatmap = ax.imshow(self.car_grid, cmap="YlOrRd", vmin=0, vmax=self.car_grid.max())
         fig.colorbar(heatmap, cax=cax).set_label("Users per Cell")
-
-        # Title for sim time
         title = ax.set_title("User Distribution (Step 0)")
 
-        # Add cell user count text
-        text_annotations = []
-        for i in range(self.rows):
-            for j in range(self.cols):
-                text = ax.text(j, i, str(self.car_grid[i, j]), ha="center", va="center", fontsize=8)
-                text_annotations.append(text)
+        text_annotations = [
+            ax.text(j, i, str(self.car_grid[i, j]), ha="center", va="center", fontsize=8)
+            for i in range(self.rows) for j in range(self.cols)
+        ]
 
-        # Coverage indicator circles (top-right corners)
         circles = []
         for i in range(self.rows):
             for j in range(self.cols):
@@ -373,51 +374,43 @@ class CellularNetworkEnv(gym.Env):
             covered_grid, _, _ = self.check_coverage()
             heatmap.set_data(self.car_grid)
 
-            # Update time
             day = self.sim_time_hours // 24
             hour = self.sim_time_hours % 24
             title.set_text(f"User Distribution (Day {day}, {hour:02d}:00)")
             self.sim_time_hours += 1
 
-            # Update numbers
             for i in range(self.rows):
                 for j in range(self.cols):
                     idx = i * self.cols + j
                     text_annotations[idx].set_text(str(self.car_grid[i, j]))
 
-            # Update coverage markers
             for idx, circle in enumerate(circles):
                 r, c = divmod(idx, self.cols)
                 coverage = covered_grid[r, c]
-                if coverage == 100:
-                    circle.set_facecolor('green')
-                elif coverage == 0:
-                    circle.set_facecolor('red')
-                else:
-                    circle.set_facecolor('orange')
+                color = 'green' if coverage == 100 else 'red' if coverage == 0 else 'orange'
+                circle.set_facecolor(color)
 
             return [heatmap] + text_annotations + circles
 
-        # Set axis limits for padding and alignment
         ax.set_xlim(-0.5, self.cols - 0.5)
         ax.set_ylim(self.rows - 0.5, -0.5)
-
         plt.tight_layout()
-        anim = FuncAnimation(fig, update, frames=steps, interval=interval, blit=False, repeat=False)
-        plt.show()
 
-    def animate_user_histogram(self, steps=240, interval=200):
-        """
-        Animate a histogram showing the number of users per cell over time.
-        Each bar represents one cell in the grid (flattened index 0 to N-1).
-        """
+        anim = FuncAnimation(fig, update, frames=steps, interval=interval, blit=False, repeat=False)
+        if save:
+            anim.save(save_path, writer="pillow", fps=1000 // interval)
+        if show:
+            plt.show()
+        else:
+            plt.close(fig)
+
+    def animate_user_histogram(self, steps=240, interval=200, save_path="user_histogram.gif", show=True, save=True):
         fig, ax = plt.subplots(figsize=(10, 5))
 
-        # Precompute and freeze user states over time
         user_history = []
         for _ in range(steps):
             self.move_users_markov_chain()
-            user_history.append(self.car_grid.flatten().copy())  # Freeze state snapshot
+            user_history.append(self.car_grid.flatten().copy())
 
         user_data = np.array(user_history)
         num_cells = self.rows * self.cols
@@ -425,7 +418,7 @@ class CellularNetworkEnv(gym.Env):
         bars = ax.bar(np.arange(num_cells), user_data[0], color='skyblue')
         title = ax.set_title("User Distribution Histogram - Step 0")
         ax.set_ylim(0, np.max(user_data) + 50)
-        ax.set_xlabel("Grid Cell Index (0 to {})".format(num_cells - 1))
+        ax.set_xlabel(f"Grid Cell Index (0 to {num_cells - 1})")
         ax.set_ylabel("Users per Cell")
 
         def update(frame):
@@ -435,7 +428,66 @@ class CellularNetworkEnv(gym.Env):
             return bars
 
         anim = FuncAnimation(fig, update, frames=steps, interval=interval, blit=False, repeat=False)
-        plt.show()
+        if save:
+            anim.save(save_path, writer="pillow", fps=1000 // interval)
+        if show:
+            plt.show()
+        else:
+            plt.close(fig)
+
+    def animate_coverage_quality(self, steps=20, interval=500, save_path="coverage_quality.gif", show=True, save=True, antenna_grid=None):
+        """Animates per-cell coverage and antenna placements with user coverage percentage."""
+        def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=256):
+            new_cmap = LinearSegmentedColormap.from_list(
+                f"{cmap.name}_trunc", cmap(np.linspace(minval, maxval, n))
+            )
+            return new_cmap
+    
+        if antenna_grid is not None:
+            self.antenna_grid = np.array(antenna_grid)
+
+        self.place_users()
+
+        fig, ax = plt.subplots(figsize=(6, 6))
+        base_cmap = colormaps["RdYlGn"]
+        cmap = truncate_colormap(base_cmap, minval=0.0, maxval=0.9)  # drop darkest green
+
+        coverage_grid, failures, _ = self.check_coverage()
+        heatmap = ax.imshow(coverage_grid, cmap=cmap, vmin=0, vmax=100)
+        title = ax.set_title("Coverage (Step 0)")
+        fig.colorbar(heatmap, ax=ax, label="Coverage %")
+
+        antenna_coords = np.argwhere(self.antenna_grid > 0)
+        ant_x = antenna_coords[:, 1]
+        ant_y = antenna_coords[:, 0]
+        ant_plot = ax.scatter(ant_x, ant_y, c='blue', marker='^', s=80, label="Antennas")
+    
+        def update(frame):
+            self.move_users_markov_chain()
+            coverage_grid, failures, _ = self.check_coverage()
+            heatmap.set_data(coverage_grid)
+
+            covered_users = self.total_users - failures
+            coverage_pct = 100 * covered_users / self.total_users
+
+            day = self.sim_time_hours // 24
+            hour = self.sim_time_hours % 24
+            title.set_text(f"Coverage (Day {day}, {hour:02d}:00) – {coverage_pct:.1f}% users covered")
+            self.sim_time_hours += 1
+
+            return [heatmap, title, ant_plot]
+
+        ax.set_xlim(-0.5, self.cols - 0.5)
+        ax.set_ylim(self.rows - 0.5, -0.5)
+        plt.tight_layout()
+
+        anim = FuncAnimation(fig, update, frames=steps, interval=interval, blit=False, repeat=False)
+        if save:
+            anim.save(save_path, writer="pillow", fps=1000 // interval)
+        if show:
+            plt.show()
+        else:
+            plt.close(fig)
 
 #%%
 # Test the environment
@@ -455,36 +507,334 @@ env = CellularNetworkEnv()
 # print("Total users after: ", np.sum(env.car_grid))
 # env.animate_user_histogram(steps=240, interval=200)env = CellularNetworkEnv()
 # %% Evaluate a fixed antenna layout over 240 steps
-env = CellularNetworkEnv()
+
+# eren 4 (performed worse than 3)
+# env = CellularNetworkEnv(rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60)
+# env.antenna_grid = np.array([
+#     [0, 0, 1, 1, 0, 1, 2, 0, 0, 0, 2, 2, 0, 2, 0, 0, 1, 0, 1, 1],
+#     [1, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0],
+#     [2, 2, 2, 0, 0, 2, 2, 0, 0, 0, 1, 2, 0, 0, 0, 0, 1, 0, 2, 0],
+#     [0, 0, 0, 2, 0, 0, 2, 0, 0, 1, 0, 2, 1, 1, 0, 0, 0, 0, 2, 0],
+#     [0, 0, 0, 1, 0, 2, 2, 1, 2, 2, 0, 0, 0, 0, 0, 1, 0, 0, 2, 0],
+#     [1, 1, 2, 2, 1, 1, 2, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 2, 2, 1],
+#     [0, 0, 1, 0, 0, 2, 1, 1, 0, 0, 0, 0, 0, 2, 0, 0, 1, 0, 0, 0],
+#     [1, 1, 0, 0, 0, 0, 0, 0, 2, 0, 1, 2, 1, 2, 0, 0, 0, 1, 1, 1],
+#     [0, 1, 2, 0, 2, 0, 0, 2, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 2, 0],
+#     [0, 1, 0, 1, 0, 0, 1, 0, 1, 2, 0, 1, 2, 0, 0, 0, 0, 0, 0, 1],
+#     [2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0],
+#     [2, 1, 0, 1, 0, 1, 1, 1, 2, 0, 0, 1, 2, 1, 2, 0, 2, 1, 1, 0],
+#     [0, 0, 2, 2, 0, 0, 0, 0, 2, 1, 2, 0, 0, 2, 0, 0, 0, 0, 1, 0],
+#     [0, 0, 2, 0, 2, 0, 0, 2, 2, 1, 0, 1, 2, 0, 2, 0, 0, 1, 0, 0],
+#     [0, 0, 0, 0, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+#     [1, 1, 1, 0, 2, 1, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+#     [1, 1, 0, 1, 1, 2, 0, 1, 0, 2, 1, 0, 0, 0, 2, 2, 0, 0, 0, 0],
+#     [0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 2, 2, 1, 1, 2, 0],
+#     [1, 0, 1, 1, 2, 0, 0, 0, 1, 0, 0, 0, 2, 0, 1, 0, 0, 1, 2, 0],
+#     [2, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 1, 0, 0, 2]
+# ], dtype=int)
+
+# env.place_users()
+# env.evaluate_placement(steps=8760)
+
+# eren 2 (performed worse than ege 4)
+# env = CellularNetworkEnv(rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60)
+# env.antenna_grid = np.array([
+#     [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+#     [2, 1, 0, 0, 0, 0, 0, 1, 1, 2, 1, 2, 0, 2, 0, 0, 1, 0, 1, 1],
+#     [2, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 2, 2, 0, 0],
+#     [0, 0, 0, 1, 0, 0, 1, 1, 0, 2, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0],
+#     [0, 0, 2, 1, 2, 0, 0, 0, 0, 2, 0, 2, 1, 2, 1, 2, 0, 0, 0, 1],
+#     [1, 0, 1, 1, 0, 0, 2, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0],
+#     [0, 1, 0, 0, 0, 1, 2, 1, 0, 2, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+#     [0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1],
+#     [1, 1, 0, 2, 1, 2, 0, 1, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1],
+#     [1, 2, 0, 2, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+#     [2, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 1, 0, 2, 1, 1, 0],
+#     [0, 0, 2, 0, 1, 0, 2, 0, 0, 2, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+#     [0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0],
+#     [1, 0, 1, 0, 1, 1, 0, 2, 0, 2, 0, 0, 2, 1, 0, 0, 2, 0, 1, 1],
+#     [0, 2, 0, 0, 0, 0, 1, 1, 0, 1, 2, 0, 0, 0, 1, 0, 0, 1, 0, 0],
+#     [0, 0, 0, 2, 0, 1, 2, 2, 0, 0, 0, 0, 1, 0, 0, 1, 2, 0, 0, 0],
+#     [0, 0, 2, 0, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1],
+#     [0, 0, 0, 2, 2, 1, 2, 0, 2, 1, 0, 1, 0, 1, 1, 2, 2, 0, 2, 1],
+#     [0, 2, 2, 0, 0, 0, 1, 0, 0, 1, 2, 0, 1, 0, 1, 1, 2, 0, 2, 0],
+#     [0, 1, 0, 2, 0, 1, 0, 0, 0, 0, 2, 1, 0, 1, 2, 0, 1, 0, 0, 0]
+# ], dtype=int)
+# env.place_users()
+# env.evaluate_placement(steps=8760)
+
+# ege 1 (performed worse than all eges in terms of coverage)
+# env = CellularNetworkEnv(rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60)
+# env.antenna_grid = np.array([
+#     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0],
+#     [0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1],
+#     [0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1],
+#     [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0],
+#     [1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0],
+#     [0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0],
+#     [0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1],
+#     [0, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0],
+#     [1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1],
+#     [1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1],
+#     [1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0],
+#     [1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0],
+#     [1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0],
+#     [0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1],
+#     [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0],
+#     [1, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1],
+#     [0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0],
+#     [1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0],
+#     [0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0],
+#     [0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0]
+# ], dtype=int)
+# env.place_users()
+# env.evaluate_placement(steps=8760)
+
+# ege 2 (performed worse than ege 4)
+# env = CellularNetworkEnv(rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60)
+# env.antenna_grid = np.array([
+#     [1, 0, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0],
+#     [1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 1],
+#     [0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1],
+#     [0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 0],
+#     [0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0],
+#     [0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0],
+#     [1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1],
+#     [0, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0],
+#     [0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1],
+#     [0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1],
+#     [0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0],
+#     [0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0],
+#     [0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0],
+#     [0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1],
+#     [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0],
+#     [0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1],
+#     [0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0],
+#     [1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0],
+#     [0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0],
+#     [0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0]
+# ], dtype=int)
+# env.place_users()
+# env.evaluate_placement(steps=8760)
+
+# eren 5 (good but worse than ege 4)
+# env = CellularNetworkEnv(rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60)
+# env.antenna_grid = np.array([
+#     [0, 1, 0, 0, 1, 1, 0, 1, 2, 1, 0, 0, 0, 1, 0, 0, 2, 0, 1, 0],
+#     [0, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 2, 1, 0, 1, 0, 0, 0, 1],
+#     [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 2, 1],
+#     [2, 0, 0, 2, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0],
+#     [0, 0, 0, 2, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 2, 0, 1, 1, 2, 0],
+#     [1, 0, 0, 0, 0, 0, 0, 1, 2, 0, 1, 0, 0, 0, 2, 0, 2, 0, 0, 1],
+#     [0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 1, 0, 1, 0, 0, 0, 1, 0, 0],
+#     [1, 1, 0, 0, 1, 0, 2, 1, 2, 0, 0, 2, 0, 0, 0, 0, 1, 0, 0, 0],
+#     [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+#     [2, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1],
+#     [0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1, 0, 0, 1],
+#     [0, 1, 0, 2, 1, 0, 0, 0, 1, 1, 1, 0, 2, 0, 0, 0, 0, 0, 0, 0],
+#     [1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 2, 2, 1, 2, 0],
+#     [0, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0],
+#     [0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 2, 0, 0, 1],
+#     [0, 0, 2, 1, 0, 1, 2, 0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 0, 0, 2],
+#     [0, 0, 2, 1, 0, 1, 0, 0, 0, 2, 0, 2, 0, 2, 1, 1, 0, 1, 2, 0],
+#     [0, 1, 0, 0, 0, 1, 2, 0, 1, 0, 1, 0, 0, 0, 1, 2, 0, 1, 0, 0],
+#     [2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 2, 0],
+#     [1, 0, 2, 0, 2, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 2, 0, 0, 0, 0]
+# ], dtype=int)
+# env.place_users()
+# env.evaluate_placement(steps=8760)
+
+# eren 6 (woerse than eren 5 with same number of antennas)
+# env = CellularNetworkEnv(rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60)
+# env.antenna_grid = np.array([
+#     [0, 0, 2, 1, 1, 0, 2, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1],
+#     [0, 0, 2, 0, 0, 0, 0, 1, 1, 0, 0, 0, 2, 2, 1, 0, 1, 0, 1, 1],
+#     [0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 2, 0, 0, 0, 0, 1, 0, 1],
+#     [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1, 0],
+#     [0, 1, 0, 0, 0, 1, 1, 0, 0, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+#     [0, 0, 1, 0, 2, 0, 2, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 2],
+#     [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 2],
+#     [1, 0, 1, 2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+#     [1, 0, 1, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+#     [2, 1, 0, 1, 2, 0, 0, 0, 2, 2, 0, 1, 1, 1, 2, 2, 0, 0, 0, 1],
+#     [0, 2, 0, 0, 1, 1, 2, 0, 0, 1, 0, 0, 2, 0, 1, 0, 2, 2, 0, 0],
+#     [0, 0, 2, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1],
+#     [1, 0, 1, 0, 0, 0, 1, 1, 2, 1, 0, 0, 0, 0, 0, 1, 0, 2, 0, 0],
+#     [1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0],
+#     [0, 0, 0, 0, 0, 0, 0, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 2, 2, 0],
+#     [0, 2, 0, 0, 0, 0, 2, 2, 0, 0, 0, 2, 2, 1, 0, 1, 0, 0, 0, 0],
+#     [1, 0, 0, 1, 1, 1, 0, 0, 2, 1, 0, 0, 0, 1, 0, 0, 0, 2, 1, 0],
+#     [1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0],
+#     [1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0],
+#     [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0]
+# ], dtype=int)
+# env.place_users()
+# env.evaluate_placement(steps=8760)
+
+# eren 7 (worse than eren 5)
+# env = CellularNetworkEnv(rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60)
+# env.antenna_grid = np.array([
+#     [0, 0, 2, 1, 1, 0, 0, 2, 0, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+#     [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 2, 0, 0, 2, 0],
+#     [0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 2, 0, 0, 0, 0, 0, 1, 0, 2, 0],
+#     [0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 2, 1, 0, 0, 0, 0, 2, 0, 0, 0],
+#     [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1, 1, 2, 1, 0],
+#     [1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 2, 0, 1, 1, 0, 1, 1, 1],
+#     [0, 0, 0, 0, 1, 0, 2, 0, 2, 2, 0, 0, 1, 1, 1, 2, 2, 1, 0, 0],
+#     [0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+#     [0, 0, 0, 0, 1, 2, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+#     [1, 2, 2, 1, 0, 0, 1, 0, 0, 0, 2, 1, 0, 0, 1, 0, 1, 0, 1, 0],
+#     [0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+#     [0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 2, 0, 0, 0, 0, 1, 0, 0, 1],
+#     [0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0],
+#     [0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0],
+#     [0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 1, 0, 0, 2, 2, 0],
+#     [0, 0, 1, 2, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0],
+#     [0, 0, 0, 0, 1, 1, 2, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+#     [2, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 2, 1, 0, 0, 0],
+#     [2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 0, 1, 1, 1, 0, 0, 0],
+#     [0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 2, 0, 0, 0, 0, 2, 1, 1, 0]
+# ], dtype=int)
+# env.place_users()
+# env.evaluate_placement(steps=8760)
+
+# ege 3 (uses too many antennas)
+# env = CellularNetworkEnv(rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60)
+# env.antenna_grid = np.array([
+#     [1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1],
+#     [1, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 1],
+#     [0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0],
+#     [1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1],
+#     [0, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1],
+#     [1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1],
+#     [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1],
+#     [1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1],
+#     [0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0],
+#     [1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0],
+#     [0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0],
+#     [0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1],
+#     [0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0],
+#     [1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1],
+#     [1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0],
+#     [0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1],
+#     [1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+#     [1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1],
+#     [0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1],
+#     [1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 1, 0, 1]
+# ], dtype=int)
+# env.place_users()
+# env.evaluate_placement(steps=8760)
+
+# ege 4
+env = CellularNetworkEnv(rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60)
 env.antenna_grid = np.array([
-    [1, 1, 0, 0, 0, 1],
-    [0, 0, 2, 1, 0, 0],
-    [0, 0, 0, 2, 2, 0],
-    [1, 0, 0, 0, 2, 0],
-    [0, 2, 1, 0, 0, 0],
-    [0, 0, 1, 1, 1, 0]
-])
+    [0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0],
+    [0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0],
+    [1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 1],
+    [1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1],
+    [1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1],
+    [1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1],
+    [0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0],
+    [0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0],
+    [1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1],
+    [1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1],
+    [0, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0],
+    [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0],
+    [1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1],
+    [0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0],
+    [1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0],
+    [0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1],
+    [1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0],
+    [1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1],
+    [0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1]
+], dtype=int)
 env.place_users()
 env.evaluate_placement(steps=8760)
 
-env.antenna_grid = np.array([
-    [0, 1, 0, 0, 1, 0],
-    [0, 0, 1, 1, 1, 0],
-    [0, 1, 1, 0, 0, 0],
-    [0, 2, 0, 0, 1, 0],
-    [0, 0, 2, 1, 1, 1],
-    [1, 0, 0, 0, 0, 1]
-])
-env.place_users()                  # initialize user distribution
-env.evaluate_placement(steps=8760) # run 1 year (8760 hours)
+# ege 5 (performed worse than ege 4)
+# env = CellularNetworkEnv(rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60)
+# env.antenna_grid = np.array([
+#     [1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0],
+#     [1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1],
+#     [0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1],
+#     [1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 1],
+#     [1, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1],
+#     [1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+#     [0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1],
+#     [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1],
+#     [0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0],
+#     [0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1],
+#     [1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1],
+#     [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1],
+#     [1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0],
+#     [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0],
+#     [1, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1],
+#     [0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 0],
+#     [0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1],
+#     [1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1],
+#     [0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0],
+#     [0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1]
+# ], dtype=int)
+# env.place_users()
+# env.evaluate_placement(steps=8760)
 
+# alessia 1 (good but ege 4 was better)
+env = CellularNetworkEnv(rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60)
 env.antenna_grid = np.array([
-    [0, 1, 0, 1, 1, 1],
-    [0, 1, 0, 1, 1, 0],
-    [0, 1, 1, 0, 1, 0],
-    [1, 1, 0, 1, 0, 0],
-    [0, 0, 1, 0, 0, 0],
-    [0, 0, 1, 0, 0, 1]
+    [2, 1, 0, 0, 1, 2, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0],
+    [0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0],
+    [0, 1, 2, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0],
+    [1, 0, 1, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1],
+    [0, 1, 0, 0, 2, 0, 0, 0, 0, 0, 1, 2, 2, 1, 1, 1, 0, 0, 2, 0],
+    [0, 0, 2, 0, 0, 1, 0, 2, 0, 1, 0, 1, 2, 1, 0, 1, 0, 1, 0, 0],
+    [1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 1, 1, 0, 2, 2, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+    [1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 1, 2, 0, 1, 0, 0, 1],
+    [1, 1, 0, 0, 0, 0, 2, 1, 3, 0, 0, 0, 0, 2, 0, 1, 1, 0, 1, 0],
+    [0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 2, 1, 1, 0],
+    [0, 0, 2, 0, 0, 1, 0, 0, 1, 0, 0, 0, 2, 0, 1, 1, 1, 1, 0, 1],
+    [1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 3, 0, 0, 2, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0],
+    [1, 0, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 2, 0, 0, 0, 1, 0, 0],
+    [1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 2, 0, 0, 0, 1, 0, 1],
+    [0, 0, 2, 3, 1, 0, 1, 0, 1, 1, 2, 0, 1, 1, 1, 0, 1, 0, 1, 0],
+    [1, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 2, 0, 1, 0, 1, 0, 0, 0, 1],
+    [0, 1, 1, 1, 1, 0, 2, 0, 2, 0, 1, 0, 0, 1, 0, 2, 0, 1, 0, 0],
+    [0, 0, 1, 0, 0, 0, 2, 0, 1, 0, 2, 0, 1, 0, 0, 2, 3, 1, 1, 0]
 ], dtype=int)
-env.place_users()                  # initialize user distribution
-env.evaluate_placement(steps=8760) # run 1 year (8760 hours)
+env.place_users()
+env.evaluate_placement(steps=8760)
+
+# eren 8 (good but ege 4 was better)
+env = CellularNetworkEnv(rows=20, cols=20, total_users=50000, antenna_capacity=300, time_step=60)
+env.antenna_grid = np.array([
+    [1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0, 1],
+    [1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0],
+    [1, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1],
+    [1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1],
+    [1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0],
+    [1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0],
+    [1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0],
+    [1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0],
+    [1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0],
+    [1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1],
+    [0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+    [1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1],
+    [1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1],
+    [0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0],
+    [1, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0],
+    [1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0],
+    [0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0],
+    [0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0],
+    [1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1],
+    [1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0]
+], dtype=int)
+env.place_users()
+env.evaluate_placement(steps=8760)
+
+# env.animate_car_grid(steps=100, interval=400, save_path="car_plot.gif", show=False, save=True)
+# env.animate_user_histogram(steps=120, interval=300, save_path="hist_plot.gif", show=True, save=False)
+
+
+# env.animate_coverage_quality(antenna_grid=env.antenna_grid, steps=240, interval=100, save_path="coverage.gif", show=True, save=True)
