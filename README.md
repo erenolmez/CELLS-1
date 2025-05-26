@@ -78,7 +78,7 @@ pip install -r requirements.txt
 docs/           # Documentation files  
 src/            # Core simulation logic  
 dqn/, ga/,      # Simulation strategy implementations  
-greedy/, etc.  
+greedy/, monte_carlo/, etc.  
 tests/          # Unit and integration tests  
 ```
 
