@@ -57,3 +57,33 @@ CELLS includes time-aware simulation logic with configurable temporal resolution
 - Time is internally tracked and used for step-based animation, performance evaluation, and metric logging.
   - 24 steps (at 60 mins/step) = 1 simulated day  
   - 720 steps ≈ 1 simulated month
+
+---
+
+## 🚀 Installation
+
+```bash
+git clone https://github.com/erenolmez/CELLS-1.git
+cd CELLS-1
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+---
+
+## 🗂 Project Structure
+
+```
+docs/           # Documentation files  
+src/            # Core simulation logic  
+dqn/, ga/,      # Simulation strategy implementations  
+greedy/, etc.  
+tests/          # Unit and integration tests  
+```
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
