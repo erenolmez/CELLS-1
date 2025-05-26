@@ -77,8 +77,11 @@ pip install -r requirements.txt
 ```
 docs/           # Documentation files  
 src/            # Core simulation logic  
-dqn/, ga/,      # Simulation strategy implementations  
-greedy/, monte_carlo/, etc.  
+dqn/            # Deep Q-Learning strategy  
+ga/             # Genetic Algorithm strategy  
+greedy/         # Greedy algorithm strategy  
+monte_carlo/    # Monte Carlo-based strategy  
+sa/             # Simulated Annealing strategy  
 tests/          # Unit and integration tests  
 ```
 
