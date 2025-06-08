@@ -5,7 +5,7 @@ import time
 
 class CellularNetworkEnv:
     def __init__(self, rows=20, cols=20,
-                 total_users=55000, antenna_capacity=300,
+                 total_users=50000, antenna_capacity=300,
                  time_step=60):
         self.rows, self.cols = rows, cols
         self.total_users = total_users
