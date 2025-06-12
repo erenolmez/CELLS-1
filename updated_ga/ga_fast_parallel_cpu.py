@@ -2,7 +2,7 @@ import numpy as np
 import random
 import os
 from multiprocessing import Pool, cpu_count
-from env_fast import CellularNetworkEnv
+from updated_grid_env import CellularNetworkEnv
 from tqdm import tqdm
 
 # =========================
