@@ -1,5 +1,5 @@
 import numpy as np
-from env_fast import CellularNetworkEnv
+from updated_grid_env import CellularNetworkEnv
 
 # === Your GA-optimized best antenna layout ===
 best_grid = np.array([
