@@ -116,12 +116,12 @@ class CellularNetworkEnvTorch:
 # ──── GA Setup ────
 ROWS, COLS = 20, 20
 GRID_SIZE  = ROWS * COLS
-POP_SIZE   = 60
+POP_SIZE   = NUM_WORKERS
 GENERATIONS = 120
 TOUR_K     = 3
 CX_PROB    = 0.7
 MUT_PROB   = 0.05
-EP_STEPS   = 240
+EP_STEPS   = 8760
 W_FAIL, W_RED, W_ANT = 2.0, 0.1, 0.5
 MAX_PER_CELL = 2
 
