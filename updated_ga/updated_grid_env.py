@@ -246,7 +246,7 @@ class CellularNetworkEnv(gym.Env):
         redirect_penalty = redirects / total_users
         antenna_cost = total_antennas / self.max_antennas  # Normalize [0, 1]
 
-        reward = 1.0 - (2.5 * failure_penalty + 0.1 * redirect_penalty + 1.0 * antenna_cost)
+        reward = 1.0 - (2.5 * failure_penalty + 0.05 * redirect_penalty + 1.0 * antenna_cost)
         return reward
 
     def step(self, action):
