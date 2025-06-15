@@ -14,56 +14,56 @@ from matplotlib import colormaps
 class CellularNetworkEnv(gym.Env):
     """ Gym environment for optimizing antenna placement and handling failures. """
 
-    def __init__(self, rows=6, cols=6, total_users=5000, antenna_capacity=300, time_step=60):
+    def __init__(self, rows=6, cols=6, total_users=5000, antenna_capacity=300, time_step=60, movement_mode="markov"):
         super(CellularNetworkEnv, self).__init__()
+        self.movement_mode = movement_mode  # "markov" or "attraction"
         self.time_step = time_step  # real-time duration per step (in minutes)
         self.sim_time_hours = 0
 
         # Grid settings
         self.rows = rows
         self.cols = cols
-        # self.max_users = 3  # Max users per cell
         self.coverage_radius = 1  # Range of coverage for each antenna
 
         # State representation
-        self.car_grid = np.zeros((self.rows, self.cols), dtype=int)  # Users per cell
+        self.user_grid = np.zeros((self.rows, self.cols), dtype=int)  # Users per cell
         self.antenna_grid = np.zeros((self.rows, self.cols), dtype=int)  # 0 (No Antenna), 1 (Antenna)
-        
+
         # Place antennas 
         self.total_users = total_users
         self.num_cells = self.rows * self.cols
+
+        self.num_students = self.total_users // 2
+        self.num_workers = self.total_users - self.num_students
+
         self.action_space = spaces.Tuple((
             spaces.Discrete(self.rows),
             spaces.Discrete(self.cols),
             spaces.Discrete(2)  # 0 = add, 1 = remove
         ))
 
-
         self.antenna_capacity = antenna_capacity
         min_antenna_by_capacity = self.total_users / self.antenna_capacity
         min_antenna_by_coverage = self.num_cells / ((2 * self.coverage_radius + 1) ** 2)
-        self.num_antennas = int(min_antenna_by_capacity) 
+        self.num_antennas = int(min_antenna_by_capacity)
         self.max_antennas = int(np.ceil(max(min_antenna_by_capacity, min_antenna_by_coverage) * 1.3))
 
-        # self.num_antennas = self.total_users // self.antenna_capacity
-        # self.max_antennas = self.total_users // self.antenna_capacity
         self.place_antennas()
-        
+
         # Place users randomly
         self.place_users()
-        
-        # Define action space (Move antennas or optimize coverage)
-        # self.action_space = spaces.Discrete(10)  # Placeholder for actions
-        # self.action_space = spaces.Discrete(self.rows * self.cols)
 
-        # Define observation space (Flattened grid states)
-        # self.observation_space = spaces.Box(low=0, high=self.max_users, shape=(self.rows * self.cols * 2,), dtype=np.int32)
         self.observation_space = spaces.Box(low=0, high=5000, shape=(self.rows * self.cols * 2,), dtype=np.int32)
 
         self._seed_value = None
         self._compute_neighbor_map()
-        # Reset environment
-        # self.reset()
+
+        self.zones = {
+        "home":  [(17, 5), (18, 3), (16, 7)],
+        "school": [(2, 16), (3, 14)],
+        "work": [(2, 3), (3, 5), (1, 4)],
+        "city_center": [(9, 9), (10, 10), (11, 11)]  # <-- new zone
+        }
     
     def seed(self, seed=None):
         self._seed_value = seed
@@ -71,13 +71,16 @@ class CellularNetworkEnv(gym.Env):
         np.random.seed(seed)
         random.seed(seed)
         return [seed]
-    
+      
     def compute_dynamic_p_move(self):
         """
         Movement probability scaled to match the real-time length of each step.
         Assumes 0.4 move probability per 60-minute step.
         """
         baseline_p_move = 0.4
+        hour = self.sim_time_hours % 24
+        if 23 <= hour or hour < 6:
+            return baseline_p_move * 0.1  # reduced night movement
         return baseline_p_move * (self.time_step / 60)
 
     def get_sim_time(self):
@@ -85,6 +88,46 @@ class CellularNetworkEnv(gym.Env):
         hour = self.sim_time_hours % 24
         return f"Day {day}, {hour:02d}:00"
 
+    def get_active_zones(self, hour, user_type):
+        day = self.sim_time_hours // 24
+        is_weekend = (day % 7) in [5, 6]  # Saturday = 5, Sunday = 6
+        is_saturday = (day % 7 == 5)
+
+        active = []
+
+        if user_type == 1:  # student
+            if not is_weekend and 8 <= hour < 15:
+                active += self.zones["school"]
+
+        elif user_type == 2:  # worker
+            if is_saturday and 10 <= hour < 14:
+                active += self.zones["work"]
+            elif not is_weekend and 9 <= hour < 18:
+                active += self.zones["work"]
+
+        # Weekend city center (for all types)
+        if is_weekend and 11 <= hour < 20:
+            active += self.zones["city_center"]
+
+        # Evening pull toward home (stronger)
+        if 18 <= hour < 23:
+            active += self.zones["home"] * 2  # duplicate to boost home pull
+
+        # Home always weakly attractive
+        active += self.zones["home"]
+
+        return active
+
+    def attraction_weights(self, hour, neighbors, user_type):
+        zones = self.get_active_zones(hour, user_type)
+        weights = []
+        for nr, nc in neighbors:
+            dists = [abs(nr - zr) + abs(nc - zc) for (zr, zc) in zones]
+            min_dist = min(dists)
+            weights.append(1.0 / (1 + min_dist))
+        weights = np.array(weights)
+        return weights / weights.sum()
+        
     def _compute_neighbor_map(self):
         self.neighbor_map = {}
         for r in range(self.rows):
@@ -122,13 +165,40 @@ class CellularNetworkEnv(gym.Env):
             c = random.randint(0, self.cols - 1)
             self.antenna_grid[r, c] += 1
 
+    # def place_users(self):
+    #     """ Randomly distribute 5000 users across the grid. """
+    #     # total_users = 5000
+    #     # flat_grid = np.random.multinomial(total_users, [1/(self.rows*self.cols)]*(self.rows*self.cols))
+    #     flat_grid = np.random.multinomial(self.total_users, [1 / self.num_cells] * self.num_cells)
+    #     self.user_grid = np.array(flat_grid).reshape((self.rows, self.cols))
+    #     # print(self.user_grid)
+
+    # def place_users(self):
+    #     # Randomly assign users to cells
+    #     flat_student = np.random.multinomial(self.num_students, [1 / self.num_cells] * self.num_cells)
+    #     flat_worker  = np.random.multinomial(self.num_workers,  [1 / self.num_cells] * self.num_cells)
+
+    #     self.user_grid_student = np.array(flat_student).reshape((self.rows, self.cols))
+    #     self.user_grid_worker  = np.array(flat_worker).reshape((self.rows, self.cols))
+    #     self.user_grid = self.user_grid_student + self.user_grid_worker  # total user view
+
     def place_users(self):
-        """ Randomly distribute 5000 users across the grid. """
-        # total_users = 5000
-        # flat_grid = np.random.multinomial(total_users, [1/(self.rows*self.cols)]*(self.rows*self.cols))
-        flat_grid = np.random.multinomial(self.total_users, [1 / self.num_cells] * self.num_cells)
-        self.car_grid = np.array(flat_grid).reshape((self.rows, self.cols))
-        # print(self.car_grid)
+        """Distribute users across the grid. Split into student/worker only if attraction-based movement is used."""
+        flat = np.random.multinomial(self.total_users, [1 / self.num_cells] * self.num_cells)
+        full_user_grid = np.array(flat).reshape((self.rows, self.cols))
+
+        if self.movement_mode == "attraction":
+            flat_stud = np.random.multinomial(self.num_students, [1 / self.num_cells] * self.num_cells)
+            flat_work = np.random.multinomial(self.num_workers,  [1 / self.num_cells] * self.num_cells)
+
+            self.user_grid_student = np.array(flat_stud).reshape((self.rows, self.cols))
+            self.user_grid_worker  = np.array(flat_work).reshape((self.rows, self.cols))
+            self.user_grid = self.user_grid_student + self.user_grid_worker
+
+        else:
+            self.user_grid = full_user_grid
+            self.user_grid_student = None
+            self.user_grid_worker = None
 
     def check_coverage(self):
             """
@@ -147,10 +217,10 @@ class CellularNetworkEnv(gym.Env):
 
             for r in range(self.rows):
                 for c in range(self.cols):
-                    users_in_cell   = self.car_grid[r, c]
+                    users_in_cell = self.user_grid[r, c]
                     remaining_users = users_in_cell
-                    users_served    = 0
-                    saturated_seen  = False          # ← flag for redirect counting
+                    users_served = 0
+                    saturated_seen = False          # ← flag for redirect counting
 
                     for dr, dc in offsets:
                         nr, nc = r + dr, c + dc
@@ -172,8 +242,8 @@ class CellularNetworkEnv(gym.Env):
 
                         served = min(free_here, remaining_users)
                         antenna_load[nr, nc] += served
-                        remaining_users      -= served
-                        users_served         += served
+                        remaining_users -= served
+                        users_served += served
 
                         # redirect counted **only** if some saturated antenna was skipped
                         if saturated_seen:
@@ -186,21 +256,28 @@ class CellularNetworkEnv(gym.Env):
 
             return covered_grid, failures, redirects
 
-
     def move_users_markov_chain(self):
+        if self.movement_mode == "markov":
+            self._move_users_uniform_markov()
+        elif self.movement_mode == "attraction":
+            self._move_users_biased_attraction()
+        else:
+            raise ValueError(f"Unknown movement_mode: {self.movement_mode}")
+        
+    def _move_users_uniform_markov(self):
         """
         Markov movement using *one* multinomial draw per cell:
-            category 0  – stay         (prob = 1 − p_move)
+            category 0  – stay          (prob = 1 − p_move)
             categories 1…k – neighbours (prob = p_move / k each)
         For edge/corner cells, invalid directions contribute to stay probability.
         """
 
         p_move = self.compute_dynamic_p_move()
-        new_car_grid = np.zeros((self.rows, self.cols), dtype=int)
+        new_user_grid = np.zeros((self.rows, self.cols), dtype=int)
 
         for r in range(self.rows):
             for c in range(self.cols):
-                users = self.car_grid[r, c]
+                users = self.user_grid[r, c]
                 if users == 0:
                     continue
 
@@ -212,15 +289,55 @@ class CellularNetworkEnv(gym.Env):
 
                 move_counts = np.random.multinomial(users, move_probs)
 
-                 # 1) stayers
-                new_car_grid[r, c] += move_counts[0]
+                # 1) stayers
+                new_user_grid[r, c] += move_counts[0]
 
                 # 2) movers to each neighbour
                 for idx, count in enumerate(move_counts[1:]):
                     nr, nc = neighbors[idx]
-                    new_car_grid[nr, nc] += count
+                    new_user_grid[nr, nc] += count
 
-        self.car_grid = new_car_grid   
+        self.user_grid = new_user_grid   
+
+    def _move_users_biased_attraction(self):
+        p_move = self.compute_dynamic_p_move()
+        new_student = np.zeros_like(self.user_grid_student)
+        new_worker  = np.zeros_like(self.user_grid_worker)
+        hour = self.sim_time_hours % 24
+
+        for r in range(self.rows):
+            for c in range(self.cols):
+                neighbors = self.neighbor_map[(r, c)]
+
+                # --- Students ---
+                n_stud = self.user_grid_student[r, c]
+                if n_stud > 0:
+                    weights = self.attraction_weights(hour, neighbors, user_type=1)
+                    stay_prob = 1.0 - p_move
+                    move_probs = [stay_prob] + list(p_move * weights)
+                    move_counts = np.random.multinomial(n_stud, move_probs)
+
+                    new_student[r, c] += move_counts[0]
+                    for idx, count in enumerate(move_counts[1:]):
+                        nr, nc = neighbors[idx]
+                        new_student[nr, nc] += count
+
+                # --- Workers ---
+                n_work = self.user_grid_worker[r, c]
+                if n_work > 0:
+                    weights = self.attraction_weights(hour, neighbors, user_type=2)
+                    stay_prob = 1.0 - p_move
+                    move_probs = [stay_prob] + list(p_move * weights)
+                    move_counts = np.random.multinomial(n_work, move_probs)
+
+                    new_worker[r, c] += move_counts[0]
+                    for idx, count in enumerate(move_counts[1:]):
+                        nr, nc = neighbors[idx]
+                        new_worker[nr, nc] += count
+
+        self.user_grid_student = new_student
+        self.user_grid_worker = new_worker
+        self.user_grid = new_student + new_worker
 
     def update_after_user_movement(self):
             """ Update coverage and failures after user movement. """
@@ -236,14 +353,14 @@ class CellularNetworkEnv(gym.Env):
         self.sim_time_hours = 0  # <-- Add this line to reset time
         self.place_antennas()
         self.place_users()
-        return np.stack([self.car_grid, self.antenna_grid], axis=-1).reshape(-1)
+        return np.stack([self.user_grid, self.antenna_grid], axis=-1).reshape(-1)
 
     def calculate_reward(self, failures, redirects):
         total_users = self.total_users
         total_antennas = np.sum(self.antenna_grid)
 
         failure_penalty = failures / total_users  # Normalize [0, 1]
-        redirect_penalty = redirects / total_users
+        redirect_penalty = redirects / total_users # Normalize [0, 1]
         antenna_cost = total_antennas / self.max_antennas  # Normalize [0, 1]
 
         reward = 1.0 - (2.5 * failure_penalty + 0.05 * redirect_penalty + 1.0 * antenna_cost)
@@ -271,7 +388,7 @@ class CellularNetworkEnv(gym.Env):
 
         done = False
 
-        obs = np.stack([self.car_grid, self.antenna_grid], axis=-1).reshape(-1)
+        obs = np.stack([self.user_grid, self.antenna_grid], axis=-1).reshape(-1)
         return obs, reward, done, {}
 
     def evaluate_placement(self, steps: int = 240):
@@ -293,11 +410,11 @@ class CellularNetworkEnv(gym.Env):
             _, failures, redirects = self.check_coverage()
             total_failures += failures
             total_redirects += redirects
-            reward_accum    += self.calculate_reward(failures, redirects)
+            reward_accum += self.calculate_reward(failures, redirects)
 
         avg_fail = total_failures / steps
-        avg_red  = total_redirects / steps
-        avg_reward = reward_accum  / steps
+        avg_red = total_redirects / steps
+        avg_reward = reward_accum / steps
         episode_cost = 1.0 - avg_reward
         userwise_coverage = 100 * (1 - total_failures / (self.total_users * steps))
 
@@ -311,10 +428,10 @@ class CellularNetworkEnv(gym.Env):
         print(f"  Episode Cost (1-R)     : {episode_cost:.4f}")
 
     def render(self):
-        """ Display the grid state with separate visuals for cars, antennas, and coverage. """
+        """ Display the grid state with separate visuals for users, antennas, and coverage. """
         self.covered_grid, failures, redirects = self.check_coverage()
-        print("\nCar Grid (Users per cell):")
-        print(self.car_grid)
+        print("\nUser Grid (Users per cell):")
+        print(self.user_grid)
         print("\nAntenna Grid (Values = Antenna count per cell):")
         print(self.antenna_grid)
         print("\nCoverage Grid (1: Covered, 0: Not Covered):")
@@ -322,7 +439,7 @@ class CellularNetworkEnv(gym.Env):
         print(f"\nFailures: {failures}, Redirects: {redirects}")
 
     def render_heatmaps(self):
-        """Visualize car, antenna, and coverage grids as separate annotated heatmaps."""
+        """Visualize user, antenna, and coverage grids as separate annotated heatmaps."""
         self.covered_grid, failures, redirects = self.check_coverage()
 
         def plot_single_heatmap(grid, title="Heatmap", cmap="plasma"):
@@ -337,27 +454,21 @@ class CellularNetworkEnv(gym.Env):
             plt.tight_layout()
             plt.show()
 
-         #plot_single_heatmap(self.car_grid, title="Car Grid (Users per Cell)", cmap="YlGnBu")
-         #plot_single_heatmap(self.car_grid, title="Car Grid (Users per Cell)", cmap="Reds")
-         #plot_single_heatmap(self.car_grid, title="Car Grid (Users per Cell)", cmap="OrRd")
-         #plot_single_heatmap(self.car_grid, title="Car Grid (Users per Cell)", cmap="PuBu")
-        plot_single_heatmap(self.car_grid, title="Car Grid (Users per Cell)", cmap="YlOrRd")
-        # plot_single_heatmap(self.car_grid, title="Car Grid (Users per Cell)", cmap="YlOrBr")
-    
+        plot_single_heatmap(self.user_grid, title="User Grid (Users per Cell)", cmap="YlOrRd") 
         # plot_single_heatmap(self.antenna_grid, title="Antenna Grid (0 or 1)", cmap="viridis")
         # plot_single_heatmap(self.covered_grid, title="Coverage Grid (0 = Uncovered, 1 = Covered)", cmap="Greens")
 
-    def animate_car_grid(self, steps=20, interval=500, save_path="user_movement.gif", show=True, save=True):
+    def animate_user_grid(self, steps=20, interval=500, save_path="user_movement.gif", show=True, save=True):
         fig, ax = plt.subplots(figsize=(6, 6))
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.1)
 
-        heatmap = ax.imshow(self.car_grid, cmap="YlOrRd", vmin=0, vmax=self.car_grid.max())
+        heatmap = ax.imshow(self.user_grid, cmap="YlOrRd", vmin=0, vmax=self.user_grid.max())
         fig.colorbar(heatmap, cax=cax).set_label("Users per Cell")
         title = ax.set_title("User Distribution (Step 0)")
 
         text_annotations = [
-            ax.text(j, i, str(self.car_grid[i, j]), ha="center", va="center", fontsize=8)
+            ax.text(j, i, str(self.user_grid[i, j]), ha="center", va="center", fontsize=8)
             for i in range(self.rows) for j in range(self.cols)
         ]
 
@@ -371,17 +482,15 @@ class CellularNetworkEnv(gym.Env):
         def update(frame):
             self.move_users_markov_chain()
             covered_grid, _, _ = self.check_coverage()
-            heatmap.set_data(self.car_grid)
+            heatmap.set_data(self.user_grid)
 
-            day = self.sim_time_hours // 24
-            hour = self.sim_time_hours % 24
-            title.set_text(f"User Distribution (Day {day}, {hour:02d}:00)")
+            title.set_text(f"User Distribution ({self.get_sim_time()})")
             self.sim_time_hours += 1
 
             for i in range(self.rows):
                 for j in range(self.cols):
                     idx = i * self.cols + j
-                    text_annotations[idx].set_text(str(self.car_grid[i, j]))
+                    text_annotations[idx].set_text(str(self.user_grid[i, j]))
 
             for idx, circle in enumerate(circles):
                 r, c = divmod(idx, self.cols)
@@ -409,7 +518,7 @@ class CellularNetworkEnv(gym.Env):
         user_history = []
         for _ in range(steps):
             self.move_users_markov_chain()
-            user_history.append(self.car_grid.flatten().copy())
+            user_history.append(self.user_grid.flatten().copy())
 
         user_data = np.array(user_history)
         num_cells = self.rows * self.cols
@@ -469,9 +578,7 @@ class CellularNetworkEnv(gym.Env):
             covered_users = self.total_users - failures
             coverage_pct = 100 * covered_users / self.total_users
 
-            day = self.sim_time_hours // 24
-            hour = self.sim_time_hours % 24
-            title.set_text(f"Coverage (Day {day}, {hour:02d}:00) – {coverage_pct:.1f}% users covered")
+            title.set_text(f"Coverage ({self.get_sim_time()}) – {coverage_pct:.1f}% users covered")
             self.sim_time_hours += 1
 
             return [heatmap, title, ant_plot]

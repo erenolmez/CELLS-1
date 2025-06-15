@@ -26,7 +26,7 @@ best_grid = np.array([
 ], dtype=int)
 
 # Setup environment
-env = CellularNetworkEnv(rows=20, cols=20, total_users=50000)
+env = CellularNetworkEnv(rows=20, cols=20, total_users=50000, movement_mode="markov")
 env.antenna_grid = best_grid
 env.place_users()
 
