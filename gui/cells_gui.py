@@ -125,16 +125,21 @@ class CellsGUI(tk.Tk):
         ttk.Label(f, text="Antenna capacity").grid(row=3, column=0, sticky="w", **pad)
         ttk.Spinbox(f, from_=10, to=1000, width=6, textvariable=self.cap_var).grid(row=3, column=1, **pad)
 
-        # global seed
-        ttk.Label(f, text="Global seed").grid(row=4, column=0, sticky="w", **pad)
-        ttk.Spinbox(f, from_=0, to=99999, width=7, textvariable=self.seed_var).grid(row=4, column=1, **pad)
+        # step size (mins per step)
+        ttk.Label(f, text="Step size (min)").grid(row=4, column=0, sticky="w", **pad)
+        self.step_size_var = tk.IntVar(value=60)
+        ttk.Spinbox(f, from_=5, to=240, increment=5, width=7, textvariable=self.step_size_var).grid(row=4, column=1, **pad)
 
-        ttk.Label(f, text="Movement mode").grid(row=5, column=0, sticky="w", **pad)
-        ttk.Combobox(f, values=["markov", "attraction"], state="readonly", width=10, textvariable=self.move_mode_var).grid(row=5, column=1, **pad)
+        # global seed
+        ttk.Label(f, text="Global seed").grid(row=5, column=0, sticky="w", **pad)
+        ttk.Spinbox(f, from_=0, to=99999, width=7, textvariable=self.seed_var).grid(row=5, column=1, **pad)
+
+        ttk.Label(f, text="Movement mode").grid(row=6, column=0, sticky="w", **pad)
+        ttk.Combobox(f, values=["markov", "attraction"], state="readonly", width=10, textvariable=self.move_mode_var).grid(row=6, column=1, **pad)
 
         # buttons (side‑by‑side)
-        ttk.Button(f, text="Init Env", command=self.init_env).grid(row=6, column=0, sticky="ew", **pad)
-        ttk.Button(f, text="Reset Env", command=self.reset_env).grid(row=6, column=1, sticky="ew", **pad)
+        ttk.Button(f, text="Init Env", command=self.init_env).grid(row=7, column=0, sticky="ew", **pad)
+        ttk.Button(f, text="Reset Env", command=self.reset_env).grid(row=7, column=1, sticky="ew", **pad)
 
     # ───────────────────── GA tab ────────────────────────────────────
     def _build_ga_tab(self) -> None:
@@ -195,6 +200,7 @@ class CellsGUI(tk.Tk):
             cols=self.cols_var.get(),
             total_users=self.users_var.get(),
             antenna_capacity=self.cap_var.get(),
+            time_step=self.step_size_var.get(),
             movement_mode=self.move_mode_var.get(),
         )
         messagebox.showinfo("Env", f"Environment initialised with seed {seed}.")
