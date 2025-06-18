@@ -223,7 +223,7 @@ def run_ga(*,
                 new_pop.append(child)
             population = new_pop
 
-            evaluator = eval_8760 if gen >= 200 else eval_2190
+            evaluator = eval_8760 if gen >= (generations - 50) else eval_2190
             fitnesses = list(tqdm(pool.imap(evaluator, population), total=pop_size, desc=f"Gen {gen+1}"))
             best_idx = int(np.argmax(fitnesses))
             best_ind = population[best_idx]
