@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import random
 import threading
 import tkinter as tk
 from pathlib import Path
@@ -70,6 +71,8 @@ class CellsGUI(tk.Tk):
         self.env: CellularNetworkEnv | None = None
         self.loaded_grid_path: Path | None = None
         self.loaded_log_path: Path | None = None
+
+        self.seed_var = tk.IntVar(value=42)
 
         # tabs
         self.sim_frame = ttk.Frame(self.nb)
@@ -136,9 +139,13 @@ class CellsGUI(tk.Tk):
         ttk.Label(f, text="Movement mode").grid(row=4, column=0, sticky="w", **pad)
         ttk.Combobox(f, values=["markov", "attraction"], state="readonly", width=10, textvariable=self.move_mode_var).grid(row=4, column=1, **pad)
 
+        # global seed
+        ttk.Label(f, text="Global seed").grid(row=5, column=0, sticky="w", **pad)
+        ttk.Spinbox(f, from_=0, to=99999, width=7, textvariable=self.seed_var).grid(row=5, column=1, **pad)
+
         # buttons (side‑by‑side)
-        ttk.Button(f, text="Init Env", command=self.init_env).grid(row=5, column=0, sticky="ew", **pad)
-        ttk.Button(f, text="Reset Env", command=self.reset_env).grid(row=5, column=1, sticky="ew", **pad)
+        ttk.Button(f, text="Init Env", command=self.init_env).grid(row=6, column=0, sticky="ew", **pad)
+        ttk.Button(f, text="Reset Env", command=self.reset_env).grid(row=6, column=1, sticky="ew", **pad)
 
     # ───────────────────── GA tab ────────────────────────────────────
     def _build_ga_tab(self) -> None:
@@ -149,7 +156,7 @@ class CellsGUI(tk.Tk):
         pad = {"padx": 4, "pady": 2}
 
         self.pop_var = tk.IntVar(value=os.cpu_count() or 12)
-        self.gen_var = tk.IntVar(value=120)
+        self.gen_var = tk.IntVar(value=250)
         self.mut_var = tk.DoubleVar(value=0.1)
         self.reinf_var = tk.IntVar(value=50)
         self.log_enable_var = tk.BooleanVar(value=True)
@@ -190,6 +197,10 @@ class CellsGUI(tk.Tk):
 
     # ───────────────────── env helpers ───────────────────────────────
     def init_env(self) -> None:
+        seed = self.seed_var.get()
+        np.random.seed(seed)
+        random.seed(seed)
+
         self.env = CellularNetworkEnv(
             rows=self.rows_var.get(),
             cols=self.cols_var.get(),
@@ -197,7 +208,7 @@ class CellsGUI(tk.Tk):
             antenna_capacity=self.cap_var.get(),
             movement_mode=self.move_mode_var.get(),
         )
-        messagebox.showinfo("Env", "Environment initialised.")
+        messagebox.showinfo("Env", f"Environment initialised with seed {seed}.")
 
     def reset_env(self) -> None:
         if self.env is None:
