@@ -5,6 +5,9 @@ import time
 from multiprocessing import Pool, cpu_count
 from updated_grid_env import CellularNetworkEnv
 from tqdm import tqdm
+import math
+import json
+
 
 # =========================
 # Parallel Genetic Algorithm for CELLS
@@ -27,6 +30,9 @@ BASE_MUTATION_RATE = 0.1
 BLOCK_SIZE = max(2, min(6, ROWS // 4))
 MOVEMENT_MODE = "attraction"
 DENSITY_BOOST_START_GEN = 50
+
+coverage_baseline = max(ROWS * COLS, math.ceil(TOTAL_USERS / 300))
+MAX_ANTENNAS_ALLOWED = int(coverage_baseline * 0.625)
 
 if MOVEMENT_MODE == "attraction":
     ANTENNA_RANGE = (0, 4)  # allow more antennas in dynamic hotspots
@@ -136,6 +142,7 @@ def run_ga():
     start_time = time.time()
     print(f"Using {NUM_CORES} CPU cores for parallel GA.")
     print(f"🚦 Movement mode: {MOVEMENT_MODE.upper()} — initializing population accordingly.")
+    gen_log = []
     population = []
 
     # === Seed from previous best if exists ===
@@ -150,7 +157,6 @@ def run_ga():
             # Overlay reinforcement
             overlay = create_zone_seeded_individual(zones)
             augmented = np.clip(seed_grid + overlay, *ANTENNA_RANGE)
-            MAX_ANTENNAS_ALLOWED = 250
             if augmented.sum() > MAX_ANTENNAS_ALLOWED:
                 excess = augmented.sum() - MAX_ANTENNAS_ALLOWED
                 flat = augmented.flatten()
@@ -258,9 +264,23 @@ def run_ga():
             num_antennas = best_ind.sum()
             print(f"  🏅 Best reward this gen: {best_fit:.4f} | 📡 Antennas used: {num_antennas}")
 
+            gen_log.append({
+                "generation": gen + 1,
+                "reward": best_fit,
+                "antennas": num_antennas
+            })
+
         print("\n✅ Best Antenna Grid:")
         print(best_ind)
         np.save("best_antenna_grid.npy", best_ind)
+
+        # Save per-generation log
+        with open("ga_progress_log.json", "w") as f:
+            json.dump(gen_log, f, indent=2)
+
+        # Save final density map for visualization
+        _, final_density = evaluate(best_ind, 8760, return_density=True)
+        np.save("final_user_density.npy", final_density)
 
     elapsed = time.time() - start_time
     mins, secs = divmod(elapsed, 60)
