@@ -111,23 +111,24 @@ class CellularNetworkEnv(gym.Env):
 
         # Evening pull toward home (stronger)
         if 18 <= hour < 23:
-            active += self.zones["home"] * 2  # duplicate to boost home pull
-
-        # Home always weakly attractive
-        active += self.zones["home"]
+            active += self.zones["home"]
 
         return active
-
+      
     def attraction_weights(self, hour, neighbors, user_type):
         zones = self.get_active_zones(hour, user_type)
+        if not zones:
+            # No active zones at this hour — return uniform weights
+            return np.ones(len(neighbors)) / len(neighbors)
         weights = []
         for nr, nc in neighbors:
             dists = [abs(nr - zr) + abs(nc - zc) for (zr, zc) in zones]
             min_dist = min(dists)
             weights.append(1.0 / (1 + min_dist))
+
         weights = np.array(weights)
         return weights / weights.sum()
-        
+
     def _compute_neighbor_map(self):
         self.neighbor_map = {}
         for r in range(self.rows):

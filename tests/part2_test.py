@@ -12,7 +12,7 @@ env.antenna_grid = antenna_layout.copy()
 
 # Simulate 30 days (720 hours)
 env.animate_user_grid(
-    steps=2190,
+    steps=8760,
     interval=100,  # reduce interval to speed up playback
     save_path="user_movement_month.gif",
     show=True,
