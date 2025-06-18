@@ -7,17 +7,6 @@
 # • Build‑in buttons to *load* any antenna‑grid .npy and any GA progress log (.json or .txt)
 #   and visualise coverage or training curves on demand.
 # • Satellite‑dish emoji PNG (antenna.png) used as the logo.
-#
-# Folder structure (suggested)
-#   CELLS‑1/
-#     gui/
-#       cells_gui.py          ← this file
-#       antenna.png           ← 256×256 icon (provided by you)
-#     updated_grid_env.py     ← environment (importable)
-#     ga_fast_parallel_cpu.py ← GA (importable)
-#
-# NOTE: make sure the parent folder is on PYTHONPATH, *or* run the GUI via
-#       `python -m gui.cells_gui` from the project root so local imports resolve.
 
 from __future__ import annotations
 
@@ -136,12 +125,12 @@ class CellsGUI(tk.Tk):
         ttk.Label(f, text="Antenna capacity").grid(row=3, column=0, sticky="w", **pad)
         ttk.Spinbox(f, from_=10, to=1000, width=6, textvariable=self.cap_var).grid(row=3, column=1, **pad)
 
-        ttk.Label(f, text="Movement mode").grid(row=4, column=0, sticky="w", **pad)
-        ttk.Combobox(f, values=["markov", "attraction"], state="readonly", width=10, textvariable=self.move_mode_var).grid(row=4, column=1, **pad)
-
         # global seed
-        ttk.Label(f, text="Global seed").grid(row=5, column=0, sticky="w", **pad)
-        ttk.Spinbox(f, from_=0, to=99999, width=7, textvariable=self.seed_var).grid(row=5, column=1, **pad)
+        ttk.Label(f, text="Global seed").grid(row=4, column=0, sticky="w", **pad)
+        ttk.Spinbox(f, from_=0, to=99999, width=7, textvariable=self.seed_var).grid(row=4, column=1, **pad)
+
+        ttk.Label(f, text="Movement mode").grid(row=5, column=0, sticky="w", **pad)
+        ttk.Combobox(f, values=["markov", "attraction"], state="readonly", width=10, textvariable=self.move_mode_var).grid(row=5, column=1, **pad)
 
         # buttons (side‑by‑side)
         ttk.Button(f, text="Init Env", command=self.init_env).grid(row=6, column=0, sticky="ew", **pad)
