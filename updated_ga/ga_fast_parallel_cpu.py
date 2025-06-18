@@ -138,7 +138,7 @@ def evaluate_2190(ind):
 def evaluate_8760(ind):
     return evaluate(ind, 8760)
 
-def run_ga():
+def run_ga(logging=True):
     start_time = time.time()
     print(f"Using {NUM_CORES} CPU cores for parallel GA.")
     print(f"🚦 Movement mode: {MOVEMENT_MODE.upper()} — initializing population accordingly.")
@@ -264,27 +264,28 @@ def run_ga():
             num_antennas = best_ind.sum()
             print(f"  🏅 Best reward this gen: {best_fit:.4f} | 📡 Antennas used: {num_antennas}")
 
-            gen_log.append({
-                "generation": gen + 1,
-                "reward": best_fit,
-                "antennas": num_antennas
-            })
+            if logging:
+                gen_log.append({
+                    "generation": gen + 1,
+                    "reward": best_fit,
+                    "antennas": num_antennas
+                })
 
         print("\n✅ Best Antenna Grid:")
         print(best_ind)
         np.save("best_antenna_grid.npy", best_ind)
 
         # Save per-generation log
-        with open("ga_progress_log.json", "w") as f:
-            json.dump(gen_log, f, indent=2)
+        if logging:
+            with open("ga_progress_log.json", "w") as f:
+                json.dump(gen_log, f, indent=2)
 
-        # Save final density map for visualization
-        _, final_density = evaluate(best_ind, 8760, return_density=True)
-        np.save("final_user_density.npy", final_density)
+            _, final_density = evaluate(best_ind, 8760, return_density=True)
+            np.save("final_user_density.npy", final_density)
 
     elapsed = time.time() - start_time
     mins, secs = divmod(elapsed, 60)
     print(f"\n⏱️ Total runtime: {int(mins)} min {int(secs)} sec")
 
 if __name__ == "__main__":
-    run_ga()
+    run_ga(logging=True)  # or False
