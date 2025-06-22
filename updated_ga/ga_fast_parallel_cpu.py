@@ -24,7 +24,7 @@ COLS = 20
 TOTAL_USERS = 50000
 NUM_CORES = cpu_count()
 POP_SIZE = NUM_CORES
-GENERATIONS = 250
+GENERATIONS = 120
 # MUTATION_RATE = 0.1
 BASE_MUTATION_RATE = 0.1
 BLOCK_SIZE = max(2, min(6, ROWS // 4))
@@ -150,7 +150,8 @@ def run_ga(logging=True):
         seed_grid = np.load("best_antenna_grid.npy")
 
         if MOVEMENT_MODE == "attraction":
-            print("🔁 Augmenting saved best grid with zone-based reinforcement.")
+            print("🔁 Augmenting saved best gri" \
+            "d with zone-based reinforcement.")
             dummy_env = CellularNetworkEnv(rows=ROWS, cols=COLS, total_users=TOTAL_USERS, movement_mode=MOVEMENT_MODE)
             zones = [dummy_env.zones["home"], dummy_env.zones["school"], dummy_env.zones["work"], dummy_env.zones["city_center"]]
 
@@ -256,7 +257,7 @@ def run_ga(logging=True):
                 new_pop.append(child)
 
             population = new_pop
-            evaluator = evaluate_8760 if gen >= (GENERATIONS - 50) else evaluate_2190
+            evaluator = evaluate_8760 if gen >= (0) else evaluate_2190
             fitnesses = list(tqdm(pool.imap(evaluator, population), total=POP_SIZE, desc=f"Generation {gen+1}"))
             best_idx = np.argmax(fitnesses)
             best_fit = fitnesses[best_idx]
@@ -266,9 +267,9 @@ def run_ga(logging=True):
 
             if logging:
                 gen_log.append({
-                    "generation": gen + 1,
-                    "reward": best_fit,
-                    "antennas": num_antennas
+                    "generation": int(gen + 1),
+                    "reward": float(best_fit),
+                    "antennas": int(num_antennas)
                 })
 
         print("\n✅ Best Antenna Grid:")

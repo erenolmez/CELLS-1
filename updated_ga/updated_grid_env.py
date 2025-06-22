@@ -14,9 +14,9 @@ from matplotlib import colormaps
 class CellularNetworkEnv(gym.Env):
     """ Gym environment for optimizing antenna placement and handling failures. """
 
-    def __init__(self, rows=6, cols=6, total_users=5000, antenna_capacity=300, time_step=60, movement_mode="markov"):
+    def __init__(self, rows=6, cols=6, total_users=5000, antenna_capacity=300, time_step=60, movement_mode="uniform", zones=None, student_ratio=0.5):
         super(CellularNetworkEnv, self).__init__()
-        self.movement_mode = movement_mode  # "markov" or "attraction"
+        self.movement_mode = movement_mode  # "uniform" or "attraction"
         self.time_step = time_step  # real-time duration per step (in minutes)
         self.sim_time_hours = 0
 
@@ -33,7 +33,7 @@ class CellularNetworkEnv(gym.Env):
         self.total_users = total_users
         self.num_cells = self.rows * self.cols
 
-        self.num_students = self.total_users // 2
+        self.num_students = int(self.total_users * student_ratio)
         self.num_workers = self.total_users - self.num_students
 
         self.action_space = spaces.Tuple((
@@ -58,12 +58,15 @@ class CellularNetworkEnv(gym.Env):
         self._seed_value = None
         self._compute_neighbor_map()
 
-        self.zones = {
-        "home":  [(17, 5), (18, 3), (16, 7)],
-        "school": [(2, 16), (3, 14)],
-        "work": [(2, 3), (3, 5), (1, 4)],
-        "city_center": [(9, 9), (10, 10), (11, 11)]  # <-- new zone
-        }
+        if movement_mode == "attraction":
+            self.zones = zones or {
+                "home":        [(17, 5), (18, 3), (16, 7)],
+                "school":      [(2, 16), (3, 14)],
+                "work":        [(2, 3), (3, 5), (1, 4)],
+                "city_center": [(9, 9), (10, 10), (11, 11)]
+            }
+        else:
+            self.zones = None
     
     def seed(self, seed=None):
         self._seed_value = seed
@@ -79,8 +82,12 @@ class CellularNetworkEnv(gym.Env):
         """
         baseline_p_move = 0.4
         hour = self.sim_time_hours % 24
-        if 23 <= hour or hour < 6:
-            return baseline_p_move * 0.1  # reduced night movement
+
+        if self.movement_mode == "attraction":
+            if 23 <= hour or hour < 6:
+                return baseline_p_move * 0.75  # reduced night movement
+            else:
+                return baseline_p_move * (self.time_step / 60)           
         return baseline_p_move * (self.time_step / 60)
 
     def get_sim_time(self):
@@ -109,7 +116,7 @@ class CellularNetworkEnv(gym.Env):
         if is_weekend and 11 <= hour < 20:
             active += self.zones["city_center"]
 
-        # Evening pull toward home (stronger)
+        # Evening pull toward home
         if 18 <= hour < 23:
             active += self.zones["home"]
 
@@ -258,7 +265,7 @@ class CellularNetworkEnv(gym.Env):
             return covered_grid, failures, redirects
 
     def move_users_markov_chain(self):
-        if self.movement_mode == "markov":
+        if self.movement_mode == "uniform":
             self._move_users_uniform_markov()
         elif self.movement_mode == "attraction":
             self._move_users_biased_attraction()
@@ -459,60 +466,6 @@ class CellularNetworkEnv(gym.Env):
         # plot_single_heatmap(self.antenna_grid, title="Antenna Grid (0 or 1)", cmap="viridis")
         # plot_single_heatmap(self.covered_grid, title="Coverage Grid (0 = Uncovered, 1 = Covered)", cmap="Greens")
 
-    def animate_user_grid(self, steps=20, interval=500, save_path="user_movement.gif", show=True, save=True):
-        fig, ax = plt.subplots(figsize=(6, 6))
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.1)
-
-        heatmap = ax.imshow(self.user_grid, cmap="YlOrRd", vmin=0, vmax=self.user_grid.max())
-        fig.colorbar(heatmap, cax=cax).set_label("Users per Cell")
-        title = ax.set_title("User Distribution (Step 0)")
-
-        text_annotations = [
-            ax.text(j, i, str(self.user_grid[i, j]), ha="center", va="center", fontsize=8)
-            for i in range(self.rows) for j in range(self.cols)
-        ]
-
-        circles = []
-        for i in range(self.rows):
-            for j in range(self.cols):
-                circle = Circle((j + 0.35, i - 0.35), radius=0.08, facecolor='gray', edgecolor='black')
-                ax.add_patch(circle)
-                circles.append(circle)
-
-        def update(frame):
-            self.move_users_markov_chain()
-            covered_grid, _, _ = self.check_coverage()
-            heatmap.set_data(self.user_grid)
-
-            title.set_text(f"User Distribution ({self.get_sim_time()})")
-            self.sim_time_hours += 1
-
-            for i in range(self.rows):
-                for j in range(self.cols):
-                    idx = i * self.cols + j
-                    text_annotations[idx].set_text(str(self.user_grid[i, j]))
-
-            for idx, circle in enumerate(circles):
-                r, c = divmod(idx, self.cols)
-                coverage = covered_grid[r, c]
-                color = 'green' if coverage == 100 else 'red' if coverage == 0 else 'orange'
-                circle.set_facecolor(color)
-
-            return [heatmap] + text_annotations + circles
-
-        ax.set_xlim(-0.5, self.cols - 0.5)
-        ax.set_ylim(self.rows - 0.5, -0.5)
-        plt.tight_layout()
-
-        anim = FuncAnimation(fig, update, frames=steps, interval=interval, blit=False, repeat=False)
-        if save:
-            anim.save(save_path, writer="pillow", fps=1000 // interval)
-        if show:
-            plt.show()
-        else:
-            plt.close(fig)
-
     def animate_user_histogram(self, steps=240, interval=200, save_path="user_histogram.gif", show=True, save=True):
         fig, ax = plt.subplots(figsize=(10, 5))
 
@@ -544,33 +497,120 @@ class CellularNetworkEnv(gym.Env):
         else:
             plt.close(fig)
 
+    def animate_user_grid(self, steps=20, interval=500, save_path="user_movement.gif", show=True, save=True):
+        fig, ax = plt.subplots(figsize=(6, 6))
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.1)
+
+        if self.movement_mode == "attraction":
+            data_grid = self.user_grid_student + self.user_grid_worker
+            vmax = max(self.user_grid_student.max(), self.user_grid_worker.max())
+        else:
+            data_grid = self.user_grid
+            vmax = self.user_grid.max()
+
+        heatmap = ax.imshow(data_grid, cmap="YlOrRd", vmin=0, vmax=vmax)
+        fig.colorbar(heatmap, cax=cax).set_label("Users per Cell")
+        title = ax.set_title("User Distribution (Step 0)")
+
+        text_annotations = []
+        for i in range(self.rows):
+            for j in range(self.cols):
+                texts = []
+                if self.movement_mode == "attraction":
+                    s = self.user_grid_student[i, j]
+                    w = self.user_grid_worker[i, j]
+                    ts = ax.text(j, i - 0.2, f"S:{s}", ha="center", va="center", fontsize=7, color='darkorange')
+                    tw = ax.text(j, i + 0.2, f"W:{w}", ha="center", va="center", fontsize=7, color='navy')
+                    texts.extend([ts, tw])
+                else:
+                    t = ax.text(j, i, str(self.user_grid[i, j]), ha="center", va="center", fontsize=8, color='black')
+                    texts.append(t)
+                text_annotations.append(texts)
+
+        circles = []
+        for i in range(self.rows):
+            for j in range(self.cols):
+                circle = Circle((j + 0.35, i - 0.35), radius=0.08, facecolor='gray', edgecolor='black')
+                ax.add_patch(circle)
+                circles.append(circle)
+
+        def update(frame):
+            self.move_users_markov_chain()
+            covered_grid, _, _ = self.check_coverage()
+            if self.movement_mode == "attraction":
+                data_grid = self.user_grid_student + self.user_grid_worker
+            else:
+                data_grid = self.user_grid
+            heatmap.set_data(data_grid)
+
+            title.set_text(f"User Distribution ({self.get_sim_time()})")
+            self.sim_time_hours += 1
+
+            for i in range(self.rows):
+                for j in range(self.cols):
+                    idx = i * self.cols + j
+                    texts = text_annotations[idx]
+                    if self.movement_mode == "attraction":
+                        texts[0].set_text(f"S:{self.user_grid_student[i, j]}")
+                        texts[1].set_text(f"W:{self.user_grid_worker[i, j]}")
+                    else:
+                        texts[0].set_text(str(self.user_grid[i, j]))
+
+            for idx, circle in enumerate(circles):
+                r, c = divmod(idx, self.cols)
+                coverage = covered_grid[r, c]
+                color = 'green' if coverage == 100 else 'red' if coverage == 0 else 'orange'
+                circle.set_facecolor(color)
+
+            return [heatmap] + sum(text_annotations, []) + circles
+
+        ax.set_xlim(-0.5, self.cols - 0.5)
+        ax.set_ylim(self.rows - 0.5, -0.5)
+        plt.tight_layout()
+
+        anim = FuncAnimation(fig, update, frames=steps, interval=interval, blit=False, repeat=False)
+        if save:
+            anim.save(save_path, writer="pillow", fps=1000 // interval)
+        if show:
+            plt.show()
+        else:
+            plt.close(fig)
+
     def animate_coverage_quality(self, steps=20, interval=500, save_path="coverage_quality.gif", show=True, save=True, antenna_grid=None):
-        """Animates per-cell coverage and antenna placements with user coverage percentage."""
         def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=256):
-            new_cmap = LinearSegmentedColormap.from_list(
-                f"{cmap.name}_trunc", cmap(np.linspace(minval, maxval, n))
-            )
-            return new_cmap
-    
+            return LinearSegmentedColormap.from_list(f"{cmap.name}_trunc", cmap(np.linspace(minval, maxval, n)))
+
         if antenna_grid is not None:
             self.antenna_grid = np.array(antenna_grid)
-
         self.place_users()
 
         fig, ax = plt.subplots(figsize=(6, 6))
-        base_cmap = colormaps["RdYlGn"]
-        cmap = truncate_colormap(base_cmap, minval=0.0, maxval=0.9)  # drop darkest green
-
+        cmap = truncate_colormap(colormaps["RdYlGn"], 0.0, 0.9)
         coverage_grid, failures, _ = self.check_coverage()
         heatmap = ax.imshow(coverage_grid, cmap=cmap, vmin=0, vmax=100)
         title = ax.set_title("Coverage (Step 0)")
         fig.colorbar(heatmap, ax=ax, label="Coverage %")
 
-        antenna_coords = np.argwhere(self.antenna_grid > 0)
-        ant_x = antenna_coords[:, 1]
-        ant_y = antenna_coords[:, 0]
-        ant_plot = ax.scatter(ant_x, ant_y, c='blue', marker='^', s=80, label="Antennas")
-    
+        antenna_size = 80 if self.movement_mode != "attraction" else 50
+        ant_coords = np.argwhere(self.antenna_grid > 0)
+        ant_x = ant_coords[:, 1]
+        ant_y = ant_coords[:, 0]
+        ant_plot = ax.scatter(ant_x, ant_y, c='blue', marker='^', s=antenna_size, label="Antennas")
+
+        text_annotations = []
+        for i in range(self.rows):
+            for j in range(self.cols):
+                texts = []
+                if self.movement_mode == "attraction":
+                    ts = ax.text(j, i - 0.3, f"S:{self.user_grid_student[i, j]}", ha="center", va="center", fontsize=7, color='darkorange')
+                    tw = ax.text(j, i + 0.3, f"W:{self.user_grid_worker[i, j]}", ha="center", va="center", fontsize=7, color='navy')
+                    texts.extend([ts, tw])
+                else:
+                    t = ax.text(j, i, str(self.user_grid[i, j]), ha="center", va="center", fontsize=8, color='black')
+                    texts.append(t)
+                text_annotations.append(texts)
+
         def update(frame):
             self.move_users_markov_chain()
             coverage_grid, failures, _ = self.check_coverage()
@@ -578,11 +618,20 @@ class CellularNetworkEnv(gym.Env):
 
             covered_users = self.total_users - failures
             coverage_pct = 100 * covered_users / self.total_users
-
             title.set_text(f"Coverage ({self.get_sim_time()}) – {coverage_pct:.1f}% users covered")
             self.sim_time_hours += 1
 
-            return [heatmap, title, ant_plot]
+            for i in range(self.rows):
+                for j in range(self.cols):
+                    idx = i * self.cols + j
+                    texts = text_annotations[idx]
+                    if self.movement_mode == "attraction":
+                        texts[0].set_text(f"S:{self.user_grid_student[i, j]}")
+                        texts[1].set_text(f"W:{self.user_grid_worker[i, j]}")
+                    else:
+                        texts[0].set_text(str(self.user_grid[i, j]))
+
+            return [heatmap, title, ant_plot] + sum(text_annotations, [])
 
         ax.set_xlim(-0.5, self.cols - 0.5)
         ax.set_ylim(self.rows - 0.5, -0.5)

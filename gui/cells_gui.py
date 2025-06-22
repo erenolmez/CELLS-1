@@ -78,9 +78,10 @@ class CellsGUI(tk.Tk):
         self.nb.add(self.plot_frame, text="Plot")
 
         # final window size = logo width + notebook reqwidth
+        # ── auto-scale GUI window to fit tallest tab ──
         self.update_idletasks()
-        width = LOGO_SIZE + self.nb.winfo_reqwidth() + 24  # ≈ padding/borders
-        height = LOGO_SIZE + 20
+        width = LOGO_SIZE + self.nb.winfo_reqwidth() + 24
+        height = max(LOGO_SIZE + 20, self.nb.winfo_reqheight() + 16)
         self.geometry(f"{width}x{height}")
 
     # ──────────────────────────── logo ───────────────────────────────
@@ -110,9 +111,11 @@ class CellsGUI(tk.Tk):
         self.cols_var = tk.IntVar(value=20)
         self.users_var = tk.IntVar(value=50_000)
         self.cap_var = tk.IntVar(value=300)
-        self.move_mode_var = tk.StringVar(value="markov")
+        self.step_size_var = tk.IntVar(value=60)
+        self.seed_var = tk.IntVar(value=42)
+        self.move_mode_var = tk.StringVar(value="uniform")
+        self.student_ratio_var = tk.DoubleVar(value=0.5)
 
-        # inputs
         ttk.Label(f, text="Rows").grid(row=0, column=0, sticky="w", **pad)
         ttk.Spinbox(f, from_=4, to=100, width=6, textvariable=self.rows_var).grid(row=0, column=1, **pad)
 
@@ -120,26 +123,104 @@ class CellsGUI(tk.Tk):
         ttk.Spinbox(f, from_=4, to=100, width=6, textvariable=self.cols_var).grid(row=1, column=1, **pad)
 
         ttk.Label(f, text="Total users").grid(row=2, column=0, sticky="w", **pad)
-        ttk.Spinbox(f, from_=1_000, to=1_000_000, increment=1_000, width=8, textvariable=self.users_var).grid(row=2, column=1, **pad)
+        ttk.Spinbox(f, from_=1000, to=1_000_000, increment=1000, width=8, textvariable=self.users_var).grid(row=2, column=1, **pad)
 
         ttk.Label(f, text="Antenna capacity").grid(row=3, column=0, sticky="w", **pad)
         ttk.Spinbox(f, from_=10, to=1000, width=6, textvariable=self.cap_var).grid(row=3, column=1, **pad)
 
-        # step size (mins per step)
         ttk.Label(f, text="Step size (min)").grid(row=4, column=0, sticky="w", **pad)
-        self.step_size_var = tk.IntVar(value=60)
         ttk.Spinbox(f, from_=5, to=240, increment=5, width=7, textvariable=self.step_size_var).grid(row=4, column=1, **pad)
 
-        # global seed
         ttk.Label(f, text="Global seed").grid(row=5, column=0, sticky="w", **pad)
         ttk.Spinbox(f, from_=0, to=99999, width=7, textvariable=self.seed_var).grid(row=5, column=1, **pad)
 
         ttk.Label(f, text="Movement mode").grid(row=6, column=0, sticky="w", **pad)
-        ttk.Combobox(f, values=["markov", "attraction"], state="readonly", width=10, textvariable=self.move_mode_var).grid(row=6, column=1, **pad)
+        move_combo = ttk.Combobox(f, values=["uniform", "attraction"], state="readonly", width=10, textvariable=self.move_mode_var)
+        move_combo.grid(row=6, column=1, **pad)
+        move_combo.bind("<<ComboboxSelected>>", lambda _: self._toggle_student_bar())
 
-        # buttons (side‑by‑side)
-        ttk.Button(f, text="Init Env", command=self.init_env).grid(row=7, column=0, sticky="ew", **pad)
-        ttk.Button(f, text="Reset Env", command=self.reset_env).grid(row=7, column=1, sticky="ew", **pad)
+        # Student ratio + zone widgets (initialised but shown only in attraction mode)
+        self.student_ratio_label = ttk.Label(f, text="Student ratio")
+        self.student_ratio_canvas = tk.Canvas(f, width=100, height=10)
+        self.student_ratio_bar = self.student_ratio_canvas.create_rectangle(0, 0, 50, 10, fill="darkorange")
+        self.worker_ratio_bar = self.student_ratio_canvas.create_rectangle(50, 0, 100, 10, fill="navy")
+
+        self.student_ratio_slider = ttk.Scale(
+            f, from_=0.0, to=1.0,
+            variable=self.student_ratio_var,
+            command=self._update_student_bar
+        )
+        self.student_ratio_spin = ttk.Spinbox(
+            f, from_=0.0, to=1.0, increment=0.05, format="%.2f",
+            width=6, textvariable=self.student_ratio_var,
+            command=lambda: self._update_student_bar()
+        )
+        self.student_ratio_var.trace_add("write", lambda *_, **__: self._update_student_bar())
+
+        self.zone_input_label = ttk.Label(f, text="Attraction zones (label: (r,c),...)")
+        self.zone_input_text = tk.Text(f, width=20, height=4)
+
+        # Buttons
+        ttk.Button(f, text="Init Env", command=self.init_env).grid(row=11, column=0, sticky="ew", **pad)
+        ttk.Button(f, text="Reset Env", command=self.reset_env).grid(row=11, column=1, sticky="ew", **pad)
+
+        self._toggle_student_bar()
+
+
+    def _toggle_student_bar(self):
+        show = self.move_mode_var.get() == "attraction"
+        widgets = [
+            (self.student_ratio_label, 7, 0),
+            (self.student_ratio_canvas, 7, 1),
+            (self.student_ratio_slider, 8, 0),
+            (self.student_ratio_spin, 8, 1),
+            (self.zone_input_label, 9, 0),
+            (self.zone_input_text, 9, 1),
+        ]
+        for w, r, c in widgets:
+            if show:
+                w.grid(row=r, column=c, padx=(4, 12), pady=(4, 6), sticky="ew")
+            else:
+                w.grid_remove()
+
+        self._update_student_bar()
+
+        # Resize GUI to fit input field
+        self.update_idletasks()
+        base_width = LOGO_SIZE + self.nb.winfo_reqwidth() + 24
+        self.geometry(f"{base_width}x{LOGO_SIZE + (130 if show else 20)}")
+
+
+    def _update_student_bar(self, *args):
+        s_ratio = self.student_ratio_var.get()
+        total_width = 100
+        self.student_ratio_canvas.coords(self.student_ratio_bar, 0, 0, total_width * s_ratio, 10)
+        self.student_ratio_canvas.coords(self.worker_ratio_bar, total_width * s_ratio, 0, total_width, 10)
+
+
+    def _parse_zone_input(self) -> dict[str, list[tuple[int, int]]]:
+        text = self.zone_input_text.get("1.0", tk.END).strip()
+        zones: dict[str, list[tuple[int, int]]] = {}
+        try:
+            for line in text.splitlines():
+                if ":" not in line:
+                    continue
+                label, coords = line.split(":", 1)
+                points = []
+                for pair in coords.split(","):
+                    pair = pair.strip()
+                    if pair.startswith("(") and pair.endswith(")"):
+                        nums = pair[1:-1].split(",")
+                        if len(nums) == 2:
+                            points.append((int(nums[0]), int(nums[1])))
+                if points:
+                    zones[label.strip()] = points
+        except Exception as e:
+            messagebox.showerror("Zone Input Error", f"Failed to parse zones:\n{e}")
+            zones.clear()
+        return zones
+
+
 
     # ───────────────────── GA tab ────────────────────────────────────
     def _build_ga_tab(self) -> None:
@@ -181,12 +262,12 @@ class CellsGUI(tk.Tk):
 
         ttk.Separator(f, orient="horizontal").grid(row=2, column=0, columnspan=3, sticky="ew", pady=4)
 
-        ttk.Button(f, text="Load antenna grid (.npy)…", command=self.choose_grid_file).grid(**pad_bt)
+        ttk.Button(f, text="Load antenna grid (.npy)", command=self.choose_grid_file).grid(**pad_bt)
         ttk.Button(f, text="Coverage (selected grid)", command=self.plot_cov_loaded).grid(**pad_bt)
 
         ttk.Separator(f, orient="horizontal").grid(row=5, column=0, columnspan=3, sticky="ew", pady=4)
 
-        ttk.Button(f, text="Load GA log (.json/.txt)…", command=self.choose_log_file).grid(**pad_bt)
+        ttk.Button(f, text="Load GA log (.json/.txt)", command=self.choose_log_file).grid(**pad_bt)
         ttk.Button(f, text="Plot GA progress", command=self.plot_ga_progress).grid(**pad_bt)
 
     # ───────────────────── env helpers ───────────────────────────────
@@ -195,6 +276,8 @@ class CellsGUI(tk.Tk):
         np.random.seed(seed)
         random.seed(seed)
 
+        zones = self._parse_zone_input() if self.move_mode_var.get() == "attraction" else None
+
         self.env = CellularNetworkEnv(
             rows=self.rows_var.get(),
             cols=self.cols_var.get(),
@@ -202,7 +285,10 @@ class CellsGUI(tk.Tk):
             antenna_capacity=self.cap_var.get(),
             time_step=self.step_size_var.get(),
             movement_mode=self.move_mode_var.get(),
-        )
+            student_ratio=self.student_ratio_var.get(),
+            zones=zones,
+        )           
+
         messagebox.showinfo("Env", f"Environment initialised with seed {seed}.")
 
     def reset_env(self) -> None:
