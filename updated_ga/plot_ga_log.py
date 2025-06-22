@@ -3,7 +3,7 @@ import re
 import matplotlib.pyplot as plt
 
 # === Path ===
-log_path = os.path.join(os.path.dirname(__file__), "ga_terminal_log.txt")
+log_path = os.path.join(os.path.dirname(__file__), "ga_terminal_log2.txt")
 
 # === Read ===
 with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
