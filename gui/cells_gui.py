@@ -166,7 +166,7 @@ class CellsGUI(tk.Tk):
         self.zone_canvas.bind("<Motion>", self._on_hover_zone)
 
         self.hover_label = ttk.Label(f, text="")
-        self.student_ratio_label = ttk.Label(f, text="Student ratio")
+        self.student_ratio_label = ttk.Label(f, text="Student/Worker ratio")
         self.student_ratio_canvas = tk.Canvas(f, width=100, height=10)
         self.student_ratio_bar = self.student_ratio_canvas.create_rectangle(0, 0, 50, 10, fill="darkorange")
         self.worker_ratio_bar = self.student_ratio_canvas.create_rectangle(50, 0, 100, 10, fill="navy")
