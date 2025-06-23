@@ -11,8 +11,8 @@ CELLS simulates:
 - 📡 Antennas with limited **range and capacity**, placed on a discrete 6×6 grid
 - 🧠 A flexible simulation loop that supports:
   - Rule-based strategies
-  - Optimization methods (e.g., linear programming, heuristics)
-  - Machine learning or reinforcement learning agents (optional)
+  - Optimization methods (e.g., heuristics, metaheuristics)
+  - Reinforcement learning agents (optional)
 - ⏱️ **Time-aware tracking** with `1 simulation step = 1 real-world hour`
 
 ---
@@ -26,6 +26,14 @@ CELLS simulates:
 - 📶 **Antenna control interface**
   - Add or remove antennas at any cell
   - Analyze the impact of spatial decisions over time
+
+- 🖥️ **Interactive GUI**
+  - Built with Tkinter, allows quick setup, simulation, and visualization
+  - Includes zone annotation, per-mode controls, and log-based plotting
+
+- 🧬 **Parallel Genetic Algorithm (CPU)**
+  - Multi-core GA for optimizing antenna layouts
+  - Real-time reward tracking and log saving
 
 - 📊 **Detailed logging**
   - Sim time (hour, day)
@@ -77,8 +85,9 @@ pip install -r requirements.txt
 ```
 docs/           # Documentation files  
 src/            # Core simulation logic  
+gui/            # Tkinter GUI for user interaction  
+updated_ga/     # Parallel CPU Genetic Algorithm  
 dqn/            # Deep Q-Learning strategy  
-ga/             # Genetic Algorithm strategy  
 greedy/         # Greedy algorithm strategy  
 monte_carlo/    # Monte Carlo-based strategy  
 sa/             # Simulated Annealing strategy  
