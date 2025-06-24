@@ -281,14 +281,14 @@ def run_ga(
             print(
                 f"  🏅 Best reward: {fitnesses[best_idx]:.4f} | 📡 Antennas: {best_ind.sum()}"
             )
+
+            num_antennas = int(best_ind.sum())
             if logging:
-                gen_log.append(
-                    {
-                        "generation": gen + 1,
-                        "reward": float(fitnesses[best_idx]),
-                        "antennas": int(best_ind.sum()),
-                    }
-                )
+                gen_log.append({
+                    "generation": int(gen + 1),
+                    "reward": float(best_fit),
+                    "antennas": num_antennas
+                })
 
     # save artefacts --------------------------------------------------
     np.save("best_antenna_grid.npy", best_ind)
