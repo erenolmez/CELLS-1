@@ -459,9 +459,7 @@ class CellsGUI(tk.Tk):
         threading.Thread(target=env.animate_coverage_quality, kwargs={
             "steps": self.steps_var.get(),
             "interval": self.interval_var.get(),
-            "save_gif": self.save_gif_var.get(),
-            "show_users": self.overlay_users_var.get(),
-            "show_antennas": self.overlay_antennas_var.get(),
+            # optionally: "save": True, "save_path": "coverage_selected.gif", "show": True
         }).start()
 
     # ---- GA log selection & plotting ----

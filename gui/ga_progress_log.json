@@ -1,0 +1,1752 @@
+[
+  {
+    "generation": 1,
+    "reward": -0.03835245000315643,
+    "antennas": 212,
+    "failures": 1109.0908675799087,
+    "redirects": 5839.8876712328765
+  },
+  {
+    "generation": 2,
+    "reward": -0.03789160616753994,
+    "antennas": 212,
+    "failures": 1106.004109589041,
+    "redirects": 5889.098401826484
+  },
+  {
+    "generation": 3,
+    "reward": -0.0382736019437955,
+    "antennas": 212,
+    "failures": 1102.4260273972602,
+    "redirects": 5905.40993150685
+  },
+  {
+    "generation": 4,
+    "reward": -0.038542853199503596,
+    "antennas": 212,
+    "failures": 1104.3519406392695,
+    "redirects": 5874.169292237443
+  },
+  {
+    "generation": 5,
+    "reward": -0.037970715642425754,
+    "antennas": 212,
+    "failures": 1099.9001141552512,
+    "redirects": 5871.175799086758
+  },
+  {
+    "generation": 6,
+    "reward": -0.037880475117311734,
+    "antennas": 212,
+    "failures": 1100.4368721461187,
+    "redirects": 5888.910045662101
+  },
+  {
+    "generation": 7,
+    "reward": -0.03676568707888812,
+    "antennas": 215,
+    "failures": 809.1793378995434,
+    "redirects": 5923.120890410959
+  },
+  {
+    "generation": 8,
+    "reward": -0.03684965580034941,
+    "antennas": 215,
+    "failures": 813.0415525114155,
+    "redirects": 5915.446575342466
+  },
+  {
+    "generation": 9,
+    "reward": -0.037745258197609606,
+    "antennas": 215,
+    "failures": 808.379794520548,
+    "redirects": 5896.7292237442925
+  },
+  {
+    "generation": 10,
+    "reward": -0.037302737421353815,
+    "antennas": 215,
+    "failures": 812.8812785388128,
+    "redirects": 5914.589155251141
+  },
+  {
+    "generation": 11,
+    "reward": -0.0374507019190708,
+    "antennas": 215,
+    "failures": 814.5012557077625,
+    "redirects": 5912.789611872146
+  },
+  {
+    "generation": 12,
+    "reward": -0.03765091801496118,
+    "antennas": 215,
+    "failures": 816.1845890410959,
+    "redirects": 5930.512557077625
+  },
+  {
+    "generation": 13,
+    "reward": -0.03735864484144524,
+    "antennas": 215,
+    "failures": 803.7706621004567,
+    "redirects": 5931.215981735159
+  },
+  {
+    "generation": 14,
+    "reward": -0.03702583833459566,
+    "antennas": 215,
+    "failures": 802.4071917808219,
+    "redirects": 5926.570433789954
+  },
+  {
+    "generation": 15,
+    "reward": -0.0371408589966964,
+    "antennas": 215,
+    "failures": 806.8784246575342,
+    "redirects": 5929.978767123288
+  },
+  {
+    "generation": 16,
+    "reward": -0.03729718970445894,
+    "antennas": 215,
+    "failures": 812.9360730593608,
+    "redirects": 5900.725228310503
+  },
+  {
+    "generation": 17,
+    "reward": -0.037074599864276164,
+    "antennas": 215,
+    "failures": 808.5746575342466,
+    "redirects": 5943.688242009132
+  },
+  {
+    "generation": 18,
+    "reward": -0.037024196553774195,
+    "antennas": 215,
+    "failures": 807.2082191780822,
+    "redirects": 5915.53698630137
+  },
+  {
+    "generation": 19,
+    "reward": -0.03752073764966442,
+    "antennas": 215,
+    "failures": 816.6336757990867,
+    "redirects": 5907.655365296803
+  },
+  {
+    "generation": 20,
+    "reward": -0.03655085762683341,
+    "antennas": 215,
+    "failures": 814.0917808219178,
+    "redirects": 5904.6050228310505
+  },
+  {
+    "generation": 21,
+    "reward": -0.037181355800349314,
+    "antennas": 215,
+    "failures": 804.0998858447489,
+    "redirects": 5899.100684931507
+  },
+  {
+    "generation": 22,
+    "reward": -0.03725199749174068,
+    "antennas": 212,
+    "failures": 1100.6424657534246,
+    "redirects": 5877.313127853881
+  },
+  {
+    "generation": 23,
+    "reward": -0.036925480115417714,
+    "antennas": 215,
+    "failures": 800.3631278538812,
+    "redirects": 5933.4089041095895
+  },
+  {
+    "generation": 24,
+    "reward": -0.02664426888506624,
+    "antennas": 211,
+    "failures": 972.5084474885845,
+    "redirects": 5700.784703196347
+  },
+  {
+    "generation": 25,
+    "reward": -0.025989112035751112,
+    "antennas": 211,
+    "failures": 960.8513698630137,
+    "redirects": 5724.9464611872145
+  },
+  {
+    "generation": 26,
+    "reward": -0.026584260551732877,
+    "antennas": 211,
+    "failures": 974.8630136986301,
+    "redirects": 5699.52305936073
+  },
+  {
+    "generation": 27,
+    "reward": -0.026890323222965643,
+    "antennas": 211,
+    "failures": 964.4544520547945,
+    "redirects": 5706.864726027397
+  },
+  {
+    "generation": 28,
+    "reward": -0.02679401705858224,
+    "antennas": 211,
+    "failures": 967.0140410958904,
+    "redirects": 5703.215182648401
+  },
+  {
+    "generation": 29,
+    "reward": -0.026641302218399446,
+    "antennas": 211,
+    "failures": 972.7884703196347,
+    "redirects": 5704.592351598173
+  },
+  {
+    "generation": 30,
+    "reward": -0.026674418200134647,
+    "antennas": 211,
+    "failures": 969.5488584474886,
+    "redirects": 5715.652397260274
+  },
+  {
+    "generation": 31,
+    "reward": -0.026754771853102745,
+    "antennas": 211,
+    "failures": 961.5643835616438,
+    "redirects": 5699.825
+  },
+  {
+    "generation": 32,
+    "reward": -0.02645936534625337,
+    "antennas": 211,
+    "failures": 967.7263698630137,
+    "redirects": 5715.504566210046
+  },
+  {
+    "generation": 33,
+    "reward": -0.026403831670454334,
+    "antennas": 211,
+    "failures": 963.4795662100456,
+    "redirects": 5689.732077625571
+  },
+  {
+    "generation": 34,
+    "reward": -0.02632795701292001,
+    "antennas": 211,
+    "failures": 976.2353881278539,
+    "redirects": 5702.5339041095895
+  },
+  {
+    "generation": 35,
+    "reward": -0.026186132127075306,
+    "antennas": 211,
+    "failures": 961.4978310502283,
+    "redirects": 5695.7184931506845
+  },
+  {
+    "generation": 36,
+    "reward": -0.026582460780043286,
+    "antennas": 211,
+    "failures": 971.3028538812786,
+    "redirects": 5711.383675799087
+  },
+  {
+    "generation": 37,
+    "reward": -0.026389980300591434,
+    "antennas": 211,
+    "failures": 971.5503424657534,
+    "redirects": 5724.919063926941
+  },
+  {
+    "generation": 38,
+    "reward": -0.026352563862235175,
+    "antennas": 211,
+    "failures": 956.5936073059361,
+    "redirects": 5725.658561643836
+  },
+  {
+    "generation": 39,
+    "reward": -0.02644432139648184,
+    "antennas": 211,
+    "failures": 971.056506849315,
+    "redirects": 5711.916095890411
+  },
+  {
+    "generation": 40,
+    "reward": -0.02639074377091088,
+    "antennas": 211,
+    "failures": 967.322602739726,
+    "redirects": 5722.328082191781
+  },
+  {
+    "generation": 41,
+    "reward": -0.026659348679586744,
+    "antennas": 211,
+    "failures": 967.7320776255708,
+    "redirects": 5707.911187214612
+  },
+  {
+    "generation": 42,
+    "reward": -0.026900749022052365,
+    "antennas": 211,
+    "failures": 963.5738584474885,
+    "redirects": 5707.5535388127855
+  },
+  {
+    "generation": 43,
+    "reward": -0.026430652675020563,
+    "antennas": 211,
+    "failures": 972.6737442922374,
+    "redirects": 5723.678424657534
+  },
+  {
+    "generation": 44,
+    "reward": -0.026627031442143904,
+    "antennas": 211,
+    "failures": 968.2753424657534,
+    "redirects": 5723.152739726027
+  },
+  {
+    "generation": 45,
+    "reward": -0.02659591431885613,
+    "antennas": 211,
+    "failures": 968.758904109589,
+    "redirects": 5701.003538812785
+  },
+  {
+    "generation": 46,
+    "reward": -0.02669032870241786,
+    "antennas": 211,
+    "failures": 969.3926940639269,
+    "redirects": 5711.966666666666
+  },
+  {
+    "generation": 47,
+    "reward": -0.026513887264061675,
+    "antennas": 211,
+    "failures": 968.5302511415525,
+    "redirects": 5705.724657534247
+  },
+  {
+    "generation": 48,
+    "reward": -0.026026753359951988,
+    "antennas": 211,
+    "failures": 968.198401826484,
+    "redirects": 5697.012442922374
+  },
+  {
+    "generation": 49,
+    "reward": -0.026164958953559348,
+    "antennas": 211,
+    "failures": 961.9644977168949,
+    "redirects": 5713.256278538813
+  },
+  {
+    "generation": 50,
+    "reward": -0.026300860095111785,
+    "antennas": 211,
+    "failures": 968.5391552511416,
+    "redirects": 5729.861187214612
+  },
+  {
+    "generation": 51,
+    "reward": -0.026189974706983938,
+    "antennas": 211,
+    "failures": 971.1601598173517,
+    "redirects": 5707.698401826484
+  },
+  {
+    "generation": 52,
+    "reward": -0.026766047538034302,
+    "antennas": 211,
+    "failures": 967.6803652968036,
+    "redirects": 5732.982534246576
+  },
+  {
+    "generation": 53,
+    "reward": -0.026565842743513677,
+    "antennas": 211,
+    "failures": 976.4888127853882,
+    "redirects": 5699.7797945205475
+  },
+  {
+    "generation": 54,
+    "reward": -0.026532690346253402,
+    "antennas": 211,
+    "failures": 962.3102739726028,
+    "redirects": 5720.231050228311
+  },
+  {
+    "generation": 55,
+    "reward": -0.02657516488963227,
+    "antennas": 211,
+    "failures": 969.2971461187215,
+    "redirects": 5720.454452054794
+  },
+  {
+    "generation": 56,
+    "reward": -0.025919998451276287,
+    "antennas": 211,
+    "failures": 962.2792237442923,
+    "redirects": 5717.069406392694
+  },
+  {
+    "generation": 57,
+    "reward": -0.026381239433011437,
+    "antennas": 211,
+    "failures": 973.4244292237443,
+    "redirects": 5708.125913242009
+  },
+  {
+    "generation": 58,
+    "reward": -0.026905472423879025,
+    "antennas": 211,
+    "failures": 975.0722602739726,
+    "redirects": 5706.144292237443
+  },
+  {
+    "generation": 59,
+    "reward": -0.01738983557645767,
+    "antennas": 208,
+    "failures": 1029.9848173515982,
+    "redirects": 7762.62203196347
+  },
+  {
+    "generation": 60,
+    "reward": -0.017347569708877672,
+    "antennas": 208,
+    "failures": 1018.9292237442922,
+    "redirects": 7707.847602739726
+  },
+  {
+    "generation": 61,
+    "reward": -0.017883204526229438,
+    "antennas": 208,
+    "failures": 1014.972602739726,
+    "redirects": 7746.880479452055
+  },
+  {
+    "generation": 62,
+    "reward": -0.017200498704311565,
+    "antennas": 208,
+    "failures": 1018.8461187214612,
+    "redirects": 7743.299086757991
+  },
+  {
+    "generation": 63,
+    "reward": -0.017541483179197355,
+    "antennas": 208,
+    "failures": 1013.7424657534247,
+    "redirects": 7764.661529680366
+  },
+  {
+    "generation": 64,
+    "reward": -0.017568790599288734,
+    "antennas": 208,
+    "failures": 1010.312100456621,
+    "redirects": 7704.9751141552515
+  },
+  {
+    "generation": 65,
+    "reward": -0.017033798476001043,
+    "antennas": 208,
+    "failures": 1032.5003424657534,
+    "redirects": 7783.868607305936
+  },
+  {
+    "generation": 66,
+    "reward": -0.01750825281390054,
+    "antennas": 208,
+    "failures": 1026.421689497717,
+    "redirects": 7765.537100456621
+  },
+  {
+    "generation": 67,
+    "reward": -0.0172147320376448,
+    "antennas": 208,
+    "failures": 1015.9268264840183,
+    "redirects": 7734.3850456621
+  },
+  {
+    "generation": 68,
+    "reward": -0.017704112402941702,
+    "antennas": 208,
+    "failures": 1023.4555936073059,
+    "redirects": 7740.829223744292
+  },
+  {
+    "generation": 69,
+    "reward": -0.017423840827599187,
+    "antennas": 208,
+    "failures": 1037.3945205479451,
+    "redirects": 7798.824543378995
+  },
+  {
+    "generation": 70,
+    "reward": -0.018080903156366377,
+    "antennas": 208,
+    "failures": 1025.054794520548,
+    "redirects": 7737.949543378995
+  },
+  {
+    "generation": 71,
+    "reward": -0.018300740713443963,
+    "antennas": 208,
+    "failures": 1026.3828767123289,
+    "redirects": 7786.756392694064
+  },
+  {
+    "generation": 72,
+    "reward": -0.01751863694632073,
+    "antennas": 208,
+    "failures": 1021.4009132420091,
+    "redirects": 7763.023515981735
+  },
+  {
+    "generation": 73,
+    "reward": -0.01778002473170874,
+    "antennas": 208,
+    "failures": 1027.8239726027398,
+    "redirects": 7809.061415525114
+  },
+  {
+    "generation": 74,
+    "reward": -0.01708247461755356,
+    "antennas": 208,
+    "failures": 1028.6611872146118,
+    "redirects": 7778.130136986301
+  },
+  {
+    "generation": 75,
+    "reward": -0.016884639914357253,
+    "antennas": 208,
+    "failures": 1017.8131278538813,
+    "redirects": 7781.667351598174
+  },
+  {
+    "generation": 76,
+    "reward": -0.01747642438924309,
+    "antennas": 208,
+    "failures": 1029.3599315068493,
+    "redirects": 7806.106278538813
+  },
+  {
+    "generation": 77,
+    "reward": -0.017137620736274964,
+    "antennas": 208,
+    "failures": 1027.3458904109589,
+    "redirects": 7786.383789954338
+  },
+  {
+    "generation": 78,
+    "reward": 0.0003304357242808973,
+    "antennas": 207,
+    "failures": 799.7421232876712,
+    "redirects": 5645.965296803653
+  },
+  {
+    "generation": 79,
+    "reward": 0.0002472698567009886,
+    "antennas": 207,
+    "failures": 801.9504566210046,
+    "redirects": 5661.623173515982
+  },
+  {
+    "generation": 80,
+    "reward": 0.000605400336153042,
+    "antennas": 207,
+    "failures": 806.7591324200913,
+    "redirects": 5652.296461187215
+  },
+  {
+    "generation": 81,
+    "reward": 0.00017621403478318163,
+    "antennas": 207,
+    "failures": 797.6639269406393,
+    "redirects": 5648.708904109589
+  },
+  {
+    "generation": 82,
+    "reward": 0.0006215585553311296,
+    "antennas": 207,
+    "failures": 796.9069634703196,
+    "redirects": 5639.799086757991
+  },
+  {
+    "generation": 83,
+    "reward": 0.0007106746512215373,
+    "antennas": 207,
+    "failures": 793.7777397260274,
+    "redirects": 5659.464840182648
+  },
+  {
+    "generation": 84,
+    "reward": 0.004756729603034366,
+    "antennas": 203,
+    "failures": 1067.5438356164384,
+    "redirects": 6922.085730593607
+  },
+  {
+    "generation": 85,
+    "reward": 0.013012697957304892,
+    "antennas": 200,
+    "failures": 1169.7277397260275,
+    "redirects": 7234.667579908676
+  },
+  {
+    "generation": 86,
+    "reward": 0.01271763357374321,
+    "antennas": 200,
+    "failures": 1153.3898401826484,
+    "redirects": 7168.703082191781
+  },
+  {
+    "generation": 87,
+    "reward": 0.012897512226711245,
+    "antennas": 200,
+    "failures": 1168.4448630136985,
+    "redirects": 7214.675913242009
+  },
+  {
+    "generation": 88,
+    "reward": 0.012906054349998926,
+    "antennas": 200,
+    "failures": 1174.2506849315068,
+    "redirects": 7227.184589041096
+  },
+  {
+    "generation": 89,
+    "reward": 0.01345407261483909,
+    "antennas": 200,
+    "failures": 1147.102283105023,
+    "redirects": 7162.052625570776
+  },
+  {
+    "generation": 90,
+    "reward": 0.01270129556004461,
+    "antennas": 200,
+    "failures": 1192.334703196347,
+    "redirects": 7291.069748858447
+  },
+  {
+    "generation": 91,
+    "reward": 0.013004016678766038,
+    "antennas": 200,
+    "failures": 1180.4775114155252,
+    "redirects": 7296.6638127853885
+  },
+  {
+    "generation": 92,
+    "reward": 0.012372414852282056,
+    "antennas": 200,
+    "failures": 1163.3173515981734,
+    "redirects": 7236.494520547945
+  },
+  {
+    "generation": 93,
+    "reward": 0.013468749441323124,
+    "antennas": 200,
+    "failures": 1180.0215753424657,
+    "redirects": 7199.172488584475
+  },
+  {
+    "generation": 94,
+    "reward": 0.012497004349998942,
+    "antennas": 200,
+    "failures": 1167.225913242009,
+    "redirects": 7191.413127853882
+  },
+  {
+    "generation": 95,
+    "reward": 0.012826106518948754,
+    "antennas": 200,
+    "failures": 1150.6092465753425,
+    "redirects": 7147.604566210046
+  },
+  {
+    "generation": 96,
+    "reward": 0.012647592477852835,
+    "antennas": 200,
+    "failures": 1182.5682648401826,
+    "redirects": 7244.876826484018
+  },
+  {
+    "generation": 97,
+    "reward": 0.01359447124497608,
+    "antennas": 200,
+    "failures": 1159.9111872146118,
+    "redirects": 7204.404109589041
+  },
+  {
+    "generation": 98,
+    "reward": 0.013672467021231826,
+    "antennas": 200,
+    "failures": 1167.776598173516,
+    "redirects": 7230.4619863013695
+  },
+  {
+    "generation": 99,
+    "reward": 0.01241773699840071,
+    "antennas": 200,
+    "failures": 1171.3430365296804,
+    "redirects": 7214.545662100457
+  },
+  {
+    "generation": 100,
+    "reward": 0.013162729121688366,
+    "antennas": 200,
+    "failures": 1163.9536529680365,
+    "redirects": 7217.591210045662
+  },
+  {
+    "generation": 101,
+    "reward": 0.01207051713538712,
+    "antennas": 200,
+    "failures": 1169.909703196347,
+    "redirects": 7219.2111872146115
+  },
+  {
+    "generation": 102,
+    "reward": 0.013497972044062858,
+    "antennas": 200,
+    "failures": 1167.8619863013698,
+    "redirects": 7201.939269406393
+  },
+  {
+    "generation": 103,
+    "reward": 0.012247617934473772,
+    "antennas": 200,
+    "failures": 1156.4,
+    "redirects": 7215.984817351598
+  },
+  {
+    "generation": 104,
+    "reward": 0.02228054829977063,
+    "antennas": 200,
+    "failures": 994.905593607306,
+    "redirects": 6031.565182648402
+  },
+  {
+    "generation": 105,
+    "reward": 0.021769620788355044,
+    "antennas": 200,
+    "failures": 1005.7151826484019,
+    "redirects": 5971.246803652968
+  },
+  {
+    "generation": 106,
+    "reward": 0.02232508551438245,
+    "antennas": 200,
+    "failures": 1009.0094748858447,
+    "redirects": 5993.677397260274
+  },
+  {
+    "generation": 107,
+    "reward": 0.021854305605706722,
+    "antennas": 200,
+    "failures": 999.3156392694063,
+    "redirects": 6048.0828767123285
+  },
+  {
+    "generation": 108,
+    "reward": 0.021993293733560505,
+    "antennas": 200,
+    "failures": 994.2821917808219,
+    "redirects": 5990.773173515981
+  },
+  {
+    "generation": 109,
+    "reward": 0.022126480034930496,
+    "antennas": 200,
+    "failures": 1003.609703196347,
+    "redirects": 6053.557077625571
+  },
+  {
+    "generation": 110,
+    "reward": 0.022227440423058194,
+    "antennas": 200,
+    "failures": 1000.6148401826484,
+    "redirects": 5980.849543378996
+  },
+  {
+    "generation": 111,
+    "reward": 0.022102030149085714,
+    "antennas": 200,
+    "failures": 1006.9408675799086,
+    "redirects": 5977.299086757991
+  },
+  {
+    "generation": 112,
+    "reward": 0.022527394760957855,
+    "antennas": 200,
+    "failures": 1003.5432648401827,
+    "redirects": 5982.7021689497715
+  },
+  {
+    "generation": 113,
+    "reward": 0.02255031074269296,
+    "antennas": 200,
+    "failures": 1012.0635844748858,
+    "redirects": 6018.2880136986305
+  },
+  {
+    "generation": 114,
+    "reward": 0.02241307067419992,
+    "antennas": 200,
+    "failures": 1014.344406392694,
+    "redirects": 5971.913242009133
+  },
+  {
+    "generation": 115,
+    "reward": 0.029947000150979525,
+    "antennas": 203,
+    "failures": 586.9078767123287,
+    "redirects": 5697.415410958904
+  },
+  {
+    "generation": 116,
+    "reward": 0.02959400277655035,
+    "antennas": 203,
+    "failures": 565.2587899543379,
+    "redirects": 5690.238356164384
+  },
+  {
+    "generation": 117,
+    "reward": 0.030245712479746608,
+    "antennas": 203,
+    "failures": 571.1017123287671,
+    "redirects": 5686.224771689498
+  },
+  {
+    "generation": 118,
+    "reward": 0.030283862822212494,
+    "antennas": 203,
+    "failures": 571.8094748858448,
+    "redirects": 5688.2316210045665
+  },
+  {
+    "generation": 119,
+    "reward": 0.030156656771984303,
+    "antennas": 203,
+    "failures": 567.6179223744292,
+    "redirects": 5693.325684931507
+  },
+  {
+    "generation": 120,
+    "reward": 0.030249795698924803,
+    "antennas": 203,
+    "failures": 579.5820776255708,
+    "redirects": 5706.028196347032
+  },
+  {
+    "generation": 121,
+    "reward": 0.029999977434084685,
+    "antennas": 203,
+    "failures": 569.95799086758,
+    "redirects": 5712.266324200913
+  },
+  {
+    "generation": 122,
+    "reward": 0.030249635082486463,
+    "antennas": 203,
+    "failures": 571.1710045662101,
+    "redirects": 5665.562671232877
+  },
+  {
+    "generation": 123,
+    "reward": 0.040090135967847246,
+    "antennas": 195,
+    "failures": 1115.694520547945,
+    "redirects": 5546.132876712329
+  },
+  {
+    "generation": 124,
+    "reward": 0.04000311313679682,
+    "antennas": 195,
+    "failures": 1114.5334474885844,
+    "redirects": 5523.604680365297
+  },
+  {
+    "generation": 125,
+    "reward": 0.040042350808029564,
+    "antennas": 195,
+    "failures": 1107.1989726027398,
+    "redirects": 5518.159703196347
+  },
+  {
+    "generation": 126,
+    "reward": 0.04025724201807547,
+    "antennas": 195,
+    "failures": 1107.3390410958905,
+    "redirects": 5576.0918949771685
+  },
+  {
+    "generation": 127,
+    "reward": 0.04023412957515324,
+    "antennas": 195,
+    "failures": 1106.6466894977168,
+    "redirects": 5567.931849315069
+  },
+  {
+    "generation": 128,
+    "reward": 0.040363850808029914,
+    "antennas": 195,
+    "failures": 1110.8329908675798,
+    "redirects": 5566.382305936073
+  },
+  {
+    "generation": 129,
+    "reward": 0.040121106629947584,
+    "antennas": 195,
+    "failures": 1107.1019406392695,
+    "redirects": 5539.204452054794
+  },
+  {
+    "generation": 130,
+    "reward": 0.053383739988005656,
+    "antennas": 198,
+    "failures": 573.7448630136986,
+    "redirects": 5502.166780821918
+  },
+  {
+    "generation": 131,
+    "reward": 0.05321690208846238,
+    "antennas": 198,
+    "failures": 572.1264840182648,
+    "redirects": 5513.986872146119
+  },
+  {
+    "generation": 132,
+    "reward": 0.05349439238526571,
+    "antennas": 198,
+    "failures": 571.9268264840183,
+    "redirects": 5506.6891552511415
+  },
+  {
+    "generation": 133,
+    "reward": 0.05313571133503797,
+    "antennas": 198,
+    "failures": 568.1251141552511,
+    "redirects": 5574.321118721461
+  },
+  {
+    "generation": 134,
+    "reward": 0.05339105345832529,
+    "antennas": 198,
+    "failures": 570.3684931506849,
+    "redirects": 5523.129908675799
+  },
+  {
+    "generation": 135,
+    "reward": 0.05338282240809704,
+    "antennas": 198,
+    "failures": 571.0139269406393,
+    "redirects": 5528.192579908676
+  },
+  {
+    "generation": 136,
+    "reward": 0.053445640330471736,
+    "antennas": 198,
+    "failures": 575.6228310502283,
+    "redirects": 5570.632876712329
+  },
+  {
+    "generation": 137,
+    "reward": 0.05347584969120238,
+    "antennas": 198,
+    "failures": 573.4722602739726,
+    "redirects": 5553.60901826484
+  },
+  {
+    "generation": 138,
+    "reward": 0.053463395467457854,
+    "antennas": 198,
+    "failures": 577.946803652968,
+    "redirects": 5509.258447488584
+  },
+  {
+    "generation": 139,
+    "reward": 0.053415236220882345,
+    "antennas": 198,
+    "failures": 578.0990867579909,
+    "redirects": 5565.408333333334
+  },
+  {
+    "generation": 140,
+    "reward": 0.053597941928645074,
+    "antennas": 198,
+    "failures": 577.4630136986301,
+    "redirects": 5554.88801369863
+  },
+  {
+    "generation": 141,
+    "reward": 0.05318288827567698,
+    "antennas": 198,
+    "failures": 575.9155251141552,
+    "redirects": 5518.237214611872
+  },
+  {
+    "generation": 142,
+    "reward": 0.05343051555878187,
+    "antennas": 198,
+    "failures": 575.344406392694,
+    "redirects": 5576.429109589041
+  },
+  {
+    "generation": 143,
+    "reward": 0.053164928914946424,
+    "antennas": 198,
+    "failures": 576.749200913242,
+    "redirects": 5563.0527397260275
+  },
+  {
+    "generation": 144,
+    "reward": 0.0533612912437135,
+    "antennas": 198,
+    "failures": 575.4236301369863,
+    "redirects": 5563.376940639269
+  },
+  {
+    "generation": 145,
+    "reward": 0.05328839820718379,
+    "antennas": 198,
+    "failures": 571.9135844748859,
+    "redirects": 5526.07705479452
+  },
+  {
+    "generation": 146,
+    "reward": 0.05312727400627077,
+    "antennas": 198,
+    "failures": 577.9389269406392,
+    "redirects": 5528.979680365297
+  },
+  {
+    "generation": 147,
+    "reward": 0.05308312195147602,
+    "antennas": 198,
+    "failures": 577.3012557077626,
+    "redirects": 5508.325799086758
+  },
+  {
+    "generation": 148,
+    "reward": 0.05325529227111082,
+    "antennas": 198,
+    "failures": 574.6868721461187,
+    "redirects": 5580.397831050228
+  },
+  {
+    "generation": 149,
+    "reward": 0.053133605969740975,
+    "antennas": 198,
+    "failures": 575.7277397260274,
+    "redirects": 5587.275228310502
+  },
+  {
+    "generation": 150,
+    "reward": 0.05441354181133344,
+    "antennas": 193,
+    "failures": 1026.4528538812785,
+    "redirects": 5493.795547945206
+  },
+  {
+    "generation": 151,
+    "reward": 0.054007750829598314,
+    "antennas": 193,
+    "failures": 1024.1722602739726,
+    "redirects": 5477.153652968036
+  },
+  {
+    "generation": 152,
+    "reward": 0.05446999340950672,
+    "antennas": 193,
+    "failures": 1019.5079908675799,
+    "redirects": 5502.614840182649
+  },
+  {
+    "generation": 153,
+    "reward": 0.05483824751909604,
+    "antennas": 193,
+    "failures": 1012.1501141552511,
+    "redirects": 5491.009246575342
+  },
+  {
+    "generation": 154,
+    "reward": 0.053898253797634736,
+    "antennas": 193,
+    "failures": 1020.0536529680365,
+    "redirects": 5499.8027397260275
+  },
+  {
+    "generation": 155,
+    "reward": 0.05383000984786299,
+    "antennas": 193,
+    "failures": 1014.4873287671232,
+    "redirects": 5523.514383561644
+  },
+  {
+    "generation": 156,
+    "reward": 0.054037233706310604,
+    "antennas": 193,
+    "failures": 1024.8114155251142,
+    "redirects": 5481.120205479452
+  },
+  {
+    "generation": 157,
+    "reward": 0.053807770235990926,
+    "antennas": 193,
+    "failures": 1020.6174657534247,
+    "redirects": 5534.499771689498
+  },
+  {
+    "generation": 158,
+    "reward": 0.05446824135471237,
+    "antennas": 193,
+    "failures": 1023.8264840182649,
+    "redirects": 5491.429908675799
+  },
+  {
+    "generation": 159,
+    "reward": 0.054252579596721306,
+    "antennas": 193,
+    "failures": 1016.4203196347032,
+    "redirects": 5474.361073059361
+  },
+  {
+    "generation": 160,
+    "reward": 0.05437924854649323,
+    "antennas": 193,
+    "failures": 1015.7884703196347,
+    "redirects": 5510.870662100457
+  },
+  {
+    "generation": 161,
+    "reward": 0.053966833135534374,
+    "antennas": 193,
+    "failures": 1013.0752283105023,
+    "redirects": 5540.192922374429
+  },
+  {
+    "generation": 162,
+    "reward": 0.05455932560128782,
+    "antennas": 193,
+    "failures": 1027.6633561643835,
+    "redirects": 5495.999657534247
+  },
+  {
+    "generation": 163,
+    "reward": 0.05443737617206398,
+    "antennas": 193,
+    "failures": 1017.3130136986301,
+    "redirects": 5503.808675799087
+  },
+  {
+    "generation": 164,
+    "reward": 0.054132315898091456,
+    "antennas": 193,
+    "failures": 1017.577397260274,
+    "redirects": 5530.7070776255705
+  },
+  {
+    "generation": 165,
+    "reward": 0.05409977172000916,
+    "antennas": 193,
+    "failures": 1018.1229452054795,
+    "redirects": 5501.272146118721
+  },
+  {
+    "generation": 166,
+    "reward": 0.05412531875512917,
+    "antennas": 198,
+    "failures": 566.4759132420091,
+    "redirects": 4972.536872146119
+  },
+  {
+    "generation": 167,
+    "reward": 0.05453258884329681,
+    "antennas": 193,
+    "failures": 1009.5493150684931,
+    "redirects": 5531.636415525114
+  },
+  {
+    "generation": 168,
+    "reward": 0.05480859649169881,
+    "antennas": 193,
+    "failures": 1023.814497716895,
+    "redirects": 5475.27203196347
+  },
+  {
+    "generation": 169,
+    "reward": 0.054440939414073214,
+    "antennas": 193,
+    "failures": 1017.8777397260274,
+    "redirects": 5473.101141552512
+  },
+  {
+    "generation": 170,
+    "reward": 0.05435075904877623,
+    "antennas": 193,
+    "failures": 1011.6431506849315,
+    "redirects": 5525.3599315068495
+  },
+  {
+    "generation": 171,
+    "reward": 0.05454327925425561,
+    "antennas": 193,
+    "failures": 1016.0046803652968,
+    "redirects": 5492.631164383562
+  },
+  {
+    "generation": 172,
+    "reward": 0.054517911331881386,
+    "antennas": 193,
+    "failures": 1015.5721461187214,
+    "redirects": 5519.436073059361
+  },
+  {
+    "generation": 173,
+    "reward": 0.05444650185699548,
+    "antennas": 193,
+    "failures": 1014.1826484018264,
+    "redirects": 5486.201598173516
+  },
+  {
+    "generation": 174,
+    "reward": 0.05430014306704121,
+    "antennas": 193,
+    "failures": 1017.8200913242009,
+    "redirects": 5529.157420091325
+  },
+  {
+    "generation": 175,
+    "reward": 0.054918547633251186,
+    "antennas": 193,
+    "failures": 1016.8038812785388,
+    "redirects": 5515.322602739726
+  },
+  {
+    "generation": 176,
+    "reward": 0.05484512455232182,
+    "antennas": 195,
+    "failures": 802.193493150685,
+    "redirects": 5818.188698630137
+  },
+  {
+    "generation": 177,
+    "reward": 0.054935543045472816,
+    "antennas": 195,
+    "failures": 807.2729452054795,
+    "redirects": 5877.972488584475
+  },
+  {
+    "generation": 178,
+    "reward": 0.05486771781716216,
+    "antennas": 195,
+    "failures": 804.7794520547945,
+    "redirects": 5855.283789954338
+  },
+  {
+    "generation": 179,
+    "reward": 0.05805848411979477,
+    "antennas": 197,
+    "failures": 546.6278538812785,
+    "redirects": 6304.30696347032
+  },
+  {
+    "generation": 180,
+    "reward": 0.05812023537550254,
+    "antennas": 197,
+    "failures": 558.3989726027397,
+    "redirects": 6297.757876712329
+  },
+  {
+    "generation": 181,
+    "reward": 0.06301789831818262,
+    "antennas": 193,
+    "failures": 818.3848173515981,
+    "redirects": 7081.40799086758
+  },
+  {
+    "generation": 182,
+    "reward": 0.06252696715379905,
+    "antennas": 193,
+    "failures": 817.5938356164384,
+    "redirects": 7086.41392694064
+  },
+  {
+    "generation": 183,
+    "reward": 0.062819859277087,
+    "antennas": 193,
+    "failures": 810.3045662100457,
+    "redirects": 7025.876369863014
+  },
+  {
+    "generation": 184,
+    "reward": 0.06225759055562573,
+    "antennas": 193,
+    "failures": 818.55399543379,
+    "redirects": 7066.759703196347
+  },
+  {
+    "generation": 185,
+    "reward": 0.06249455733644758,
+    "antennas": 193,
+    "failures": 825.9025114155252,
+    "redirects": 7093.419863013699
+  },
+  {
+    "generation": 186,
+    "reward": 0.06456710904877636,
+    "antennas": 193,
+    "failures": 793.2837899543379,
+    "redirects": 6550.25799086758
+  },
+  {
+    "generation": 187,
+    "reward": 0.06439029500768041,
+    "antennas": 193,
+    "failures": 785.7301369863013,
+    "redirects": 6543.3
+  },
+  {
+    "generation": 188,
+    "reward": 0.06467098998484952,
+    "antennas": 193,
+    "failures": 795.5627853881278,
+    "redirects": 6563.975570776256
+  },
+  {
+    "generation": 189,
+    "reward": 0.06429870288439303,
+    "antennas": 193,
+    "failures": 798.1689497716895,
+    "redirects": 6552.7365296803655
+  },
+  {
+    "generation": 190,
+    "reward": 0.06456953610357084,
+    "antennas": 193,
+    "failures": 791.6873287671233,
+    "redirects": 6544.895091324201
+  },
+  {
+    "generation": 191,
+    "reward": 0.07128179962018397,
+    "antennas": 194,
+    "failures": 573.675,
+    "redirects": 5407.35901826484
+  },
+  {
+    "generation": 192,
+    "reward": 0.07120669025945318,
+    "antennas": 194,
+    "failures": 577.7303652968036,
+    "redirects": 5382.5248858447485
+  },
+  {
+    "generation": 193,
+    "reward": 0.0714368976795442,
+    "antennas": 194,
+    "failures": 588.2227168949772,
+    "redirects": 5452.278652968036
+  },
+  {
+    "generation": 194,
+    "reward": 0.07099380532794645,
+    "antennas": 194,
+    "failures": 581.312100456621,
+    "redirects": 5377.36198630137
+  },
+  {
+    "generation": 195,
+    "reward": 0.07160877130968141,
+    "antennas": 194,
+    "failures": 581.191894977169,
+    "redirects": 5386.879109589041
+  },
+  {
+    "generation": 196,
+    "reward": 0.07064613478000123,
+    "antennas": 194,
+    "failures": 594.7220319634703,
+    "redirects": 5472.298858447489
+  },
+  {
+    "generation": 197,
+    "reward": 0.07123878249689612,
+    "antennas": 194,
+    "failures": 594.303196347032,
+    "redirects": 5466.745433789954
+  },
+  {
+    "generation": 198,
+    "reward": 0.07185243918576269,
+    "antennas": 193,
+    "failures": 656.5923515981735,
+    "redirects": 6614.207420091324
+  },
+  {
+    "generation": 199,
+    "reward": 0.0719113171537991,
+    "antennas": 193,
+    "failures": 659.0276255707763,
+    "redirects": 6642.775228310502
+  },
+  {
+    "generation": 200,
+    "reward": 0.07276285635534378,
+    "antennas": 194,
+    "failures": 562.1373287671233,
+    "redirects": 4601.956392694064
+  },
+  {
+    "generation": 201,
+    "reward": 0.0731648279306861,
+    "antennas": 194,
+    "failures": 568.5641552511415,
+    "redirects": 4668.270205479452
+  },
+  {
+    "generation": 202,
+    "reward": 0.07315000818182807,
+    "antennas": 194,
+    "failures": 561.5804794520548,
+    "redirects": 4596.247716894977
+  },
+  {
+    "generation": 203,
+    "reward": 0.0731534157160741,
+    "antennas": 194,
+    "failures": 573.0027397260274,
+    "redirects": 4627.498059360731
+  },
+  {
+    "generation": 204,
+    "reward": 0.08041075820339602,
+    "antennas": 192,
+    "failures": 599.6358447488584,
+    "redirects": 4581.484246575343
+  },
+  {
+    "generation": 205,
+    "reward": 0.08068235489289391,
+    "antennas": 192,
+    "failures": 615.2917808219178,
+    "redirects": 4652.524429223744
+  },
+  {
+    "generation": 206,
+    "reward": 0.08188429041990161,
+    "antennas": 195,
+    "failures": 286.065296803653,
+    "redirects": 5141.63002283105
+  },
+  {
+    "generation": 207,
+    "reward": 0.08184912500894283,
+    "antennas": 195,
+    "failures": 290.6142694063927,
+    "redirects": 5153.660045662101
+  },
+  {
+    "generation": 208,
+    "reward": 0.08155466770300716,
+    "antennas": 195,
+    "failures": 289.7060502283105,
+    "redirects": 5119.780251141552
+  },
+  {
+    "generation": 209,
+    "reward": 0.08184061736054113,
+    "antennas": 195,
+    "failures": 286.7916666666667,
+    "redirects": 5092.969063926941
+  },
+  {
+    "generation": 210,
+    "reward": 0.08159667386739088,
+    "antennas": 195,
+    "failures": 287.68630136986303,
+    "redirects": 5106.991780821918
+  },
+  {
+    "generation": 211,
+    "reward": 0.08166958322812087,
+    "antennas": 195,
+    "failures": 288.8175799086758,
+    "redirects": 5140.404566210045
+  },
+  {
+    "generation": 212,
+    "reward": 0.08171873208656907,
+    "antennas": 195,
+    "failures": 286.43744292237443,
+    "redirects": 5133.627511415525
+  },
+  {
+    "generation": 213,
+    "reward": 0.0819301266071168,
+    "antennas": 195,
+    "failures": 286.63401826484017,
+    "redirects": 5097.64098173516
+  },
+  {
+    "generation": 214,
+    "reward": 0.08163928391305283,
+    "antennas": 195,
+    "failures": 286.9421232876712,
+    "redirects": 5102.902511415525
+  },
+  {
+    "generation": 215,
+    "reward": 0.08158589110483325,
+    "antennas": 195,
+    "failures": 288.6908675799087,
+    "redirects": 5141.686872146119
+  },
+  {
+    "generation": 216,
+    "reward": 0.08512470420796248,
+    "antennas": 192,
+    "failures": 488.2609589041096,
+    "redirects": 5453.537442922375
+  },
+  {
+    "generation": 217,
+    "reward": 0.09348647185573299,
+    "antennas": 191,
+    "failures": 423.725799086758,
+    "redirects": 5611.86198630137
+  },
+  {
+    "generation": 218,
+    "reward": 0.09381027265482003,
+    "antennas": 191,
+    "failures": 421.060502283105,
+    "redirects": 5571.173401826484
+  },
+  {
+    "generation": 219,
+    "reward": 0.09589567893335839,
+    "antennas": 191,
+    "failures": 364.1642694063927,
+    "redirects": 5257.0559360730595
+  },
+  {
+    "generation": 220,
+    "reward": 0.09653507224133516,
+    "antennas": 187,
+    "failures": 687.0884703196347,
+    "redirects": 6491.899543378995
+  },
+  {
+    "generation": 221,
+    "reward": 0.09716329415914399,
+    "antennas": 187,
+    "failures": 700.8917808219178,
+    "redirects": 6517.481506849315
+  },
+  {
+    "generation": 222,
+    "reward": 0.09684359233266035,
+    "antennas": 187,
+    "failures": 689.047602739726,
+    "redirects": 6480.140753424657
+  },
+  {
+    "generation": 223,
+    "reward": 0.10956502726100985,
+    "antennas": 182,
+    "failures": 881.0388127853881,
+    "redirects": 8119.023173515981
+  },
+  {
+    "generation": 224,
+    "reward": 0.10936905157607878,
+    "antennas": 182,
+    "failures": 869.016095890411,
+    "redirects": 8043.2430365296805
+  },
+  {
+    "generation": 225,
+    "reward": 0.10972153650758541,
+    "antennas": 182,
+    "failures": 858.1412100456621,
+    "redirects": 8069.531621004567
+  },
+  {
+    "generation": 226,
+    "reward": 0.11387979353891817,
+    "antennas": 181,
+    "failures": 878.6521689497716,
+    "redirects": 8149.307534246575
+  },
+  {
+    "generation": 227,
+    "reward": 0.11392257789964833,
+    "antennas": 181,
+    "failures": 870.4788812785388,
+    "redirects": 8183.14406392694
+  },
+  {
+    "generation": 228,
+    "reward": 0.11402139913252583,
+    "antennas": 181,
+    "failures": 877.4973744292238,
+    "redirects": 8163.6058219178085
+  },
+  {
+    "generation": 229,
+    "reward": 0.11716904132683112,
+    "antennas": 185,
+    "failures": 454.7036529680365,
+    "redirects": 6984.434474885845
+  },
+  {
+    "generation": 230,
+    "reward": 0.11759390274235634,
+    "antennas": 185,
+    "failures": 475.28504566210046,
+    "redirects": 7044.260273972603
+  },
+  {
+    "generation": 231,
+    "reward": 0.11770775614544583,
+    "antennas": 187,
+    "failures": 287.8420091324201,
+    "redirects": 5962.921803652968
+  },
+  {
+    "generation": 232,
+    "reward": 0.11961566564189965,
+    "antennas": 185,
+    "failures": 415.300799086758,
+    "redirects": 7315.304223744292
+  },
+  {
+    "generation": 233,
+    "reward": 0.1196123260300273,
+    "antennas": 185,
+    "failures": 413.6592465753425,
+    "redirects": 7269.699200913242
+  },
+  {
+    "generation": 234,
+    "reward": 0.1197331732903019,
+    "antennas": 185,
+    "failures": 416.7324200913242,
+    "redirects": 7308.229109589041
+  },
+  {
+    "generation": 235,
+    "reward": 0.12176085429423682,
+    "antennas": 184,
+    "failures": 473.7939497716895,
+    "redirects": 6641.628538812785
+  },
+  {
+    "generation": 236,
+    "reward": 0.12157408876912204,
+    "antennas": 184,
+    "failures": 477.7972602739726,
+    "redirects": 6677.475228310503
+  },
+  {
+    "generation": 237,
+    "reward": 0.1226819784488558,
+    "antennas": 183,
+    "failures": 551.2877853881279,
+    "redirects": 6503.482305936073
+  },
+  {
+    "generation": 238,
+    "reward": 0.12240537433926758,
+    "antennas": 183,
+    "failures": 554.091095890411,
+    "redirects": 6528.893607305936
+  },
+  {
+    "generation": 239,
+    "reward": 0.1295825881736208,
+    "antennas": 181,
+    "failures": 586.7852739726028,
+    "redirects": 7933.253082191781
+  },
+  {
+    "generation": 240,
+    "reward": 0.12943033897270834,
+    "antennas": 181,
+    "failures": 576.5509132420092,
+    "redirects": 7918.2544520547945
+  },
+  {
+    "generation": 241,
+    "reward": 0.12959378490941262,
+    "antennas": 182,
+    "failures": 492.9908675799087,
+    "redirects": 7370.9899543379
+  },
+  {
+    "generation": 242,
+    "reward": 0.13442621710119268,
+    "antennas": 182,
+    "failures": 383.1813926940639,
+    "redirects": 7334.036529680366
+  },
+  {
+    "generation": 243,
+    "reward": 0.13577971922384896,
+    "antennas": 181,
+    "failures": 447.76404109589043,
+    "redirects": 7745.181164383562
+  },
+  {
+    "generation": 244,
+    "reward": 0.1361230189955391,
+    "antennas": 181,
+    "failures": 456.21358447488586,
+    "redirects": 7741.801141552512
+  },
+  {
+    "generation": 245,
+    "reward": 0.13559677173526472,
+    "antennas": 181,
+    "failures": 436.6536529680365,
+    "redirects": 7720.035502283105
+  },
+  {
+    "generation": 246,
+    "reward": 0.1356621775571831,
+    "antennas": 181,
+    "failures": 444.40947488584476,
+    "redirects": 7757.071347031963
+  },
+  {
+    "generation": 247,
+    "reward": 0.13687770248932155,
+    "antennas": 182,
+    "failures": 336.86541095890414,
+    "redirects": 7148.194520547945
+  },
+  {
+    "generation": 248,
+    "reward": 0.1377134833112383,
+    "antennas": 182,
+    "failures": 338.1810502283105,
+    "redirects": 7098.586301369863
+  },
+  {
+    "generation": 249,
+    "reward": 0.13768566139343022,
+    "antennas": 182,
+    "failures": 330.5981735159817,
+    "redirects": 7107.928767123288
+  },
+  {
+    "generation": 250,
+    "reward": 0.13799750803663519,
+    "antennas": 181,
+    "failures": 399.93630136986303,
+    "redirects": 7508.223059360731
+  }
+]

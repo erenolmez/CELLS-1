@@ -63,11 +63,11 @@ env.place_users()
 # env.evaluate_placement(steps=8760)
 
 # Optional: animate for 10 days (240 steps)
-# env.animate_coverage_quality(antenna_grid=env.antenna_grid, steps=240, interval=100, show=True, save=False)
+env.animate_coverage_quality(antenna_grid=env.antenna_grid, steps=240, interval=100, show=True, save=False)
 
-env.animate_user_grid(
-    steps=240,
-    interval=100,
-    show=True,
-    save=False
-)
+# env.animate_user_grid(
+#     steps=240,
+#     interval=100,
+#     show=True,
+#     save=False
+# )
