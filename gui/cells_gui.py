@@ -1,12 +1,12 @@
 # cells_gui.py — lean Tkinter GUI for CELLS project
 # --------------------------------------------------
-# • auto‑sized window (no blank strip on the right)
+# • auto-sized window (no blank strip on the right)
 # • Simulation / Genetic Alg. / Plot tabs
-# • Init Env + Reset Env side‑by‑side
-# • GA settings include reinforcement‑start generation + optional per‑generation log
-# • Build‑in buttons to *load* any antenna‑grid .npy and any GA progress log (.json or .txt)
+# • Init Env + Reset Env side-by-side
+# • GA settings include reinforcement-start generation + optional per-generation log
+# • Build-in buttons to *load* any antenna-grid .npy and any GA progress log (.json or .txt)
 #   and visualise coverage or training curves on demand.
-# • Satellite‑dish emoji PNG (antenna.png) used as the logo.
+# • Satellite-dish emoji PNG (antenna.png) used as the logo.
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from tkinter import filedialog, messagebox, ttk
 
 import numpy as np
 from PIL import Image, ImageTk  # pip install pillow
+import csv  # CSV support for GA logs
 
 # ────────────────────────── local imports ────────────────────────────
 try:
@@ -384,7 +385,7 @@ class CellsGUI(tk.Tk):
 
         ttk.Separator(f, orient="horizontal").grid(row=7, column=0, columnspan=2, sticky="ew", pady=4)
 
-        ttk.Button(f, text="Load GA log (.json/.txt)", command=self.choose_log_file).grid(row=8, column=0, columnspan=2, **pad_bt)
+        ttk.Button(f, text="Load GA log (.json/.txt/.csv)", command=self.choose_log_file).grid(row=8, column=0, columnspan=2, **pad_bt)
         ttk.Button(f, text="Plot GA progress", command=self.plot_ga_progress).grid(row=9, column=0, columnspan=2, **pad_bt)
 
     # ───────────────────── env helpers ───────────────────────────────
@@ -458,16 +459,21 @@ class CellsGUI(tk.Tk):
         threading.Thread(target=env.animate_coverage_quality, kwargs={
             "steps": self.steps_var.get(),
             "interval": self.interval_var.get(),
-            "save_gif": self.save_gif_var.get(),
-            "show_users": self.overlay_users_var.get(),
-            "show_antennas": self.overlay_antennas_var.get(),
+            # optionally: "save": True, "save_path": "coverage_selected.gif", "show": True
         }).start()
 
     # ---- GA log selection & plotting ----
     def choose_log_file(self) -> None:
+        ### CHANGED ###
         path = filedialog.askopenfilename(
             title="Select GA progress log",
-            filetypes=[("JSON", "*.json"), ("Text", "*.txt"), ("All files", "*.*")],
+            filetypes=[
+                ("Supported logs", "*.json *.txt *.csv"),
+                ("JSON", "*.json"),
+                ("Text", "*.txt"),
+                ("CSV", "*.csv"),
+                ("All files", "*.*"),
+            ],
         )
         if path:
             self.loaded_log_path = Path(path)
@@ -484,7 +490,9 @@ class CellsGUI(tk.Tk):
         rewards: list[float] = []
         antennas: list[int] = []
 
-        if self.loaded_log_path.suffix.lower() == ".json":
+        suffix = self.loaded_log_path.suffix.lower()
+
+        if suffix == ".json":
             try:
                 with open(self.loaded_log_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
@@ -495,23 +503,46 @@ class CellsGUI(tk.Tk):
             except Exception as e:
                 messagebox.showerror("Log", f"Failed to parse JSON log:\n{e}")
                 return
+
+        ### CHANGED ###
+        elif suffix == ".csv":
+            try:
+                with open(self.loaded_log_path, "r", encoding="utf-8", newline="") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        g = row.get("generation") or row.get("gen")
+                        r = row.get("reward") or row.get("fitness")
+                        a = row.get("antennas") or row.get("antenna_count") or row.get("num_antennas")
+                        if g is None or r is None:
+                            # skip incomplete lines
+                            continue
+                        gens.append(int(float(g)))
+                        rewards.append(float(r))
+                        antennas.append(int(float(a)) if a is not None and a != "" else 0)
+            except Exception as e:
+                messagebox.showerror("Log", f"Failed to parse CSV log:\n{e}")
+                return
+
         else:  # assume plain text like ga_terminal_log.txt
             import re
-
             gen_pat = re.compile(r"Generation\s+(\d+)")
             reward_pat = re.compile(r"reward this gen:\s*([-+]?[0-9]*\.?[0-9]+)")
             ant_pat = re.compile(r"Antennas used:\s*(\d+)")
 
             current_gen = None
-            with open(self.loaded_log_path, "r", encoding="utf-8", errors="ignore") as f:
-                for line in f:
-                    if (m := gen_pat.search(line)):
-                        current_gen = int(m.group(1))
-                    if current_gen is not None and (m2 := reward_pat.search(line)) and (m3 := ant_pat.search(line)):
-                        gens.append(current_gen)
-                        rewards.append(float(m2.group(1)))
-                        antennas.append(int(m3.group(1)))
-                        current_gen = None
+            try:
+                with open(self.loaded_log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        if (m := gen_pat.search(line)):
+                            current_gen = int(m.group(1))
+                        if current_gen is not None and (m2 := reward_pat.search(line)) and (m3 := ant_pat.search(line)):
+                            gens.append(current_gen)
+                            rewards.append(float(m2.group(1)))
+                            antennas.append(int(m3.group(1)))
+                            current_gen = None
+            except Exception as e:
+                messagebox.showerror("Log", f"Failed to parse text log:\n{e}")
+                return
 
         if not gens:
             messagebox.showerror("Log", "No data parsed from selected log file.")
@@ -549,7 +580,7 @@ class CellsGUI(tk.Tk):
                     logging=self.log_enable_var.get(),
                 )
             except TypeError:
-                # backward‑compatibility: fall back to original signature
+                # backward-compatibility: fall back to original signature
                 run_ga()
             except Exception as e:
                 messagebox.showerror("GA", f"Error while running GA:\n{e}")
