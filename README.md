@@ -83,15 +83,16 @@ pip install -r requirements.txt
 ## 🗂 Project Structure
 
 ```
-docs/           # Documentation files  
-src/            # Core simulation logic  
-gui/            # Tkinter GUI for user interaction  
-updated_ga/     # Parallel CPU Genetic Algorithm  
-dqn/            # Deep Q-Learning strategy  
-greedy/         # Greedy algorithm strategy  
-monte_carlo/    # Monte Carlo-based strategy  
-sa/             # Simulated Annealing strategy  
-tests/          # Unit and integration tests  
+docs/           # Documentation files
+dqn/            # Deep Q-Learning strategy
+greedy/         # Greedy algorithm strategy
+gui/            # Tkinter GUI for user interaction
+monte_carlo/    # Monte Carlo-based strategy
+results/        # Generated experiment outputs
+sa/             # Simulated Annealing strategy
+src/            # Core simulation logic
+tests/          # Unit and integration tests
+updated_ga/     # Parallel CPU Genetic Algorithm
 ```
 
 ---
